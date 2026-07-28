@@ -1,12 +1,25 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const cookieParser = require('cookie-parser');
 const { Queue } = require('bullmq');
 const redisConnection = require('./config/redis');
 
+const authRoutes = require('./routes/authRoutes');
+
 const app = express();
-app.use(cors());
+
+// Configure CORS for credentials
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:4200',
+  credentials: true
+}));
+
 app.use(express.json());
+app.use(cookieParser());
+
+// Auth routes
+app.use('/api/auth', authRoutes);
 
 const imageQueue = new Queue('image-processing', { connection: redisConnection });
 
