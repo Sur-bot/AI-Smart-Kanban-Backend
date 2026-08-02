@@ -30,33 +30,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE OR REPLACE FUNCTION public.soft_delete_task(p_task_id UUID)
-RETURNS void AS $$
-BEGIN
-    UPDATE public.tasks SET is_deleted = true, deleted_at = NOW() WHERE id = p_task_id;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION public.restore_task(p_task_id UUID)
-RETURNS void AS $$
-BEGIN
-    UPDATE public.tasks SET is_deleted = false, deleted_at = NULL WHERE id = p_task_id;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE OR REPLACE FUNCTION public.get_task_tree(p_task_id UUID)
-RETURNS TABLE (id UUID, title VARCHAR, parent_task_id UUID, depth INTEGER) AS $$
-WITH RECURSIVE task_tree AS (
-    SELECT t.id, t.title, t.parent_task_id, 0 AS depth
-    FROM public.tasks t WHERE t.id = p_task_id AND t.is_deleted = false
-    UNION ALL
-    SELECT t.id, t.title, t.parent_task_id, tt.depth + 1
-    FROM public.tasks t
-    INNER JOIN task_tree tt ON tt.id = t.parent_task_id
-    WHERE t.is_deleted = false AND tt.depth < 10
-)
-SELECT * FROM task_tree;
-$$ LANGUAGE sql;
 
 -- ═══════════════════════════════════════════════════════
 -- 001 - WORKSPACES
@@ -235,6 +208,35 @@ BEFORE UPDATE OF status_id ON public.tasks
 FOR EACH ROW EXECUTE FUNCTION public.auto_set_completed_at();
 
 CREATE OR REPLACE VIEW public.active_tasks AS SELECT * FROM public.tasks WHERE is_deleted = false AND is_archived = false;
+
+-- Functions dùng bảng tasks — phải đặt SAU khi tạo bảng tasks
+CREATE OR REPLACE FUNCTION public.soft_delete_task(p_task_id UUID)
+RETURNS void AS $$
+BEGIN
+    UPDATE public.tasks SET is_deleted = true, deleted_at = NOW() WHERE id = p_task_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.restore_task(p_task_id UUID)
+RETURNS void AS $$
+BEGIN
+    UPDATE public.tasks SET is_deleted = false, deleted_at = NULL WHERE id = p_task_id;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION public.get_task_tree(p_task_id UUID)
+RETURNS TABLE (id UUID, title VARCHAR, parent_task_id UUID, depth INTEGER) AS $$
+WITH RECURSIVE task_tree AS (
+    SELECT t.id, t.title, t.parent_task_id, 0 AS depth
+    FROM public.tasks t WHERE t.id = p_task_id AND t.is_deleted = false
+    UNION ALL
+    SELECT t.id, t.title, t.parent_task_id, tt.depth + 1
+    FROM public.tasks t
+    INNER JOIN task_tree tt ON tt.id = t.parent_task_id
+    WHERE t.is_deleted = false AND tt.depth < 10
+)
+SELECT * FROM task_tree;
+$$ LANGUAGE sql;
 
 -- ═══════════════════════════════════════════════════════
 -- 004 - TASK RELATIONS
