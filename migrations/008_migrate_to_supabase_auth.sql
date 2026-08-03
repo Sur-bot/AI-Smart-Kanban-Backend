@@ -4,6 +4,35 @@
 -- Mục đích: Xóa bảng users tự tạo, cập nhật toàn bộ FK sang auth.users
 -- ========================================================
 
+-- BƯỚC 0: Xóa sạch toàn bộ dữ liệu nghiệp vụ cũ (data test, data từ public.users cũ)
+-- CASCADE sẽ xóa các bảng liên quan theo thứ tự FK tự động
+-- ─────────────────────────────────────────────────────────
+TRUNCATE TABLE
+    public.task_custom_field_values,
+    public.custom_fields,
+    public.notifications,
+    public.performance_snapshots,
+    public.workflow_runs,
+    public.workflows,
+    public.task_activities,
+    public.time_logs,
+    public.task_attachments,
+    public.task_comments,
+    public.task_checklist_items,
+    public.task_checklists,
+    public.task_dependencies,
+    public.task_labels,
+    public.task_assignees,
+    public.tasks,
+    public.sprint_burndown,
+    public.sprints,
+    public.task_statuses,
+    public.labels,
+    public.project_members,
+    public.projects,
+    public.workspaces
+CASCADE;
+
 -- BƯỚC 1: Xóa bảng users cũ (phải xóa FK constraints trước)
 -- ─────────────────────────────────────────────────────────
 
