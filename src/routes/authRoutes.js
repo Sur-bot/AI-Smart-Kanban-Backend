@@ -7,6 +7,7 @@ router.post('/register', authController.register);
 
 // Xác minh email
 router.get('/verify-email', authController.verifyEmail);
+router.post('/resend-verification', authController.resendVerification);
 
 // Đăng nhập
 router.post('/login', authController.login);

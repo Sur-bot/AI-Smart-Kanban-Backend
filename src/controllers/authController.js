@@ -117,6 +117,49 @@ exports.verifyEmail = async (req, res) => {
   }
 };
 
+// GỬI LẠI EMAIL XÁC MINH
+exports.resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ error: 'Email không được để trống' });
+    }
+
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('id, email, is_verified')
+      .eq('email', email)
+      .single();
+
+    if (error || !user) {
+      return res.status(404).json({ error: 'Không tìm thấy tài khoản với email này' });
+    }
+
+    if (user.is_verified) {
+      return res.status(400).json({ error: 'Tài khoản này đã được xác minh trước đó' });
+    }
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date();
+    expiresAt.setHours(expiresAt.getHours() + 24);
+
+    await supabase
+      .from('users')
+      .update({
+        verification_token: verificationToken,
+        verification_expires: expiresAt.toISOString()
+      })
+      .eq('id', user.id);
+
+    sendVerificationEmail(email, verificationToken);
+
+    return res.status(200).json({ message: 'Đã gửi lại email xác minh thành công. Vui lòng kiểm tra hộp thư.' });
+  } catch (error) {
+    console.error('[Resend Verification Error]:', error);
+    return res.status(500).json({ error: 'Lỗi server nội bộ' });
+  }
+};
+
 // ĐĂNG NHẬP
 exports.login = async (req, res) => {
   try {
