@@ -5,7 +5,7 @@ const cookieParser = require('cookie-parser');
 const { Queue } = require('bullmq');
 const redisConnection = require('./config/redis');
 
-const authRoutes = require('./routes/authRoutes');
+const profileRoutes = require('./routes/profileRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 
@@ -21,7 +21,9 @@ app.use(express.json());
 app.use(cookieParser());
 
 // API routes
-app.use('/api/auth', authRoutes);
+// Auth (đăng ký, đăng nhập, đăng xuất) được xử lý bởi Supabase phía Frontend.
+// Backend chỉ xử lý nghiệp vụ sau khi đã xác thực JWT.
+app.use('/api/profile', profileRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 

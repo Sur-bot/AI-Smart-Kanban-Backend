@@ -1,59 +1,71 @@
-const jwt = require('jsonwebtoken');
 const supabase = require('../config/supabase');
 
-const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_for_development_only';
-
 /**
- * Middleware xác thực JWT (hỗ trợ cả Bearer Token lẫn HTTP-only Cookie)
+ * Middleware xác thực JWT do Supabase Auth cấp phát.
+ * Không tự ký, không tự verify bằng JWT_SECRET nữa.
+ * Supabase Admin API (service_role) verify token và trả về thông tin user.
+ *
+ * Hỗ trợ 2 nguồn token:
+ *  1. Authorization: Bearer <access_token>   (chuẩn REST / SPA)
+ *  2. Cookie: sb-access-token=<token>        (set bởi supabase-js phía client)
  */
 const authenticate = async (req, res, next) => {
   try {
     let token = null;
 
-    // 1. Kiểm tra Authorization Header (Bearer token)
-    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer ')) {
-      token = req.headers.authorization.split(' ')[1];
-    } 
-    // 2. Fallback sang cookie (hỗ trợ cả access_token và accessToken)
-    else if (req.cookies && (req.cookies.access_token || req.cookies.accessToken)) {
-      token = req.cookies.access_token || req.cookies.accessToken;
+    // 1. Ưu tiên Authorization header (Bearer)
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.split(' ')[1];
+    }
+
+    // 2. Fallback sang cookies (supabase-js lưu cookie dạng sb-<project-ref>-auth-token)
+    if (!token && req.cookies) {
+      // Tìm cookie có tiền tố sb- (Supabase đặt tự động)
+      const sbCookieKey = Object.keys(req.cookies).find(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+      if (sbCookieKey) {
+        try {
+          const parsed = JSON.parse(req.cookies[sbCookieKey]);
+          token = parsed?.access_token || null;
+        } catch {
+          token = req.cookies[sbCookieKey];
+        }
+      }
     }
 
     if (!token) {
-      // Trong môi trường development: nếu chưa đăng nhập, tự động fallback user đầu tiên trong DB để test UI liền mạch
-      if (process.env.NODE_ENV !== 'production') {
-        const { data: firstUser } = await supabase.from('users').select('id, email').limit(1).maybeSingle();
-        if (firstUser) {
-          req.user = firstUser;
-          return next();
-        }
-      }
-
       return res.status(401).json({
         error: 'Unauthorized',
-        message: 'Bạn cần đăng nhập để thực hiện thao tác này (Thiếu token).'
+        message: 'Bạn cần đăng nhập để thực hiện thao tác này.'
       });
     }
 
-    // 3. Verify token
-    const decoded = jwt.verify(token, JWT_SECRET);
-    req.user = decoded; // { id, email, ... }
+    // 3. Gọi Supabase Auth Admin để verify token — không cần JWT_SECRET
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({
+        error: 'InvalidToken',
+        message: 'Phiên đăng nhập không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.'
+      });
+    }
+
+    // 4. Gắn user vào request để các controller sử dụng
+    req.user = {
+      id: user.id,
+      email: user.email,
+      name: user.user_metadata?.full_name || user.email,
+      avatar_url: user.user_metadata?.avatar_url || null,
+    };
 
     next();
-  } catch (error) {
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({
-        error: 'TokenExpired',
-        message: 'Phiên đăng nhập đã hết hạn, vui lòng đăng nhập lại.'
-      });
-    }
-    return res.status(401).json({
-      error: 'InvalidToken',
-      message: 'Token không hợp lệ.'
+  } catch (err) {
+    console.error('[Auth Middleware] Lỗi xác thực:', err.message);
+    return res.status(500).json({
+      error: 'AuthError',
+      message: 'Lỗi hệ thống khi xác thực. Vui lòng thử lại.'
     });
   }
 };
 
-module.exports = {
-  authenticate
-};
+module.exports = { authenticate };
