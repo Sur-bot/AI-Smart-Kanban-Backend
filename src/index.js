@@ -6,6 +6,8 @@ const { Queue } = require('bullmq');
 const redisConnection = require('./config/redis');
 
 const authRoutes = require('./routes/authRoutes');
+const projectRoutes = require('./routes/projectRoutes');
+const taskRoutes = require('./routes/taskRoutes');
 
 const app = express();
 
@@ -18,8 +20,10 @@ app.use(cors({
 app.use(express.json());
 app.use(cookieParser());
 
-// Auth routes
+// API routes
 app.use('/api/auth', authRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/tasks', taskRoutes);
 
 const imageQueue = new Queue('image-processing', { connection: redisConnection });
 
