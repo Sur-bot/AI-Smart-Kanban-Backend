@@ -68,7 +68,7 @@ async function getTasks(filters = {}, userId) {
       assignee:user_profiles!assignee_id(id, name, email, avatar_url),
       task_assignees(
         user_id,
-        user:user_profiles(id, name, email, avatar_url)
+        user:user_profiles!task_assignees_user_id_fkey(id, name, email, avatar_url)
       ),
       task_labels(
         label_id,
@@ -238,7 +238,7 @@ async function getTaskById(taskId, userId) {
       assignee:user_profiles!assignee_id(id, name, email, avatar_url),
       task_assignees(
         user_id,
-        user:user_profiles(id, name, email, avatar_url)
+        user:user_profiles!task_assignees_user_id_fkey(id, name, email, avatar_url)
       ),
       task_labels(
         label_id,
@@ -256,7 +256,7 @@ async function getTaskById(taskId, userId) {
           due_date,
           sort_order,
           completed_at,
-          assignee:user_profiles!assignee_id(id, name, avatar_url)
+          assignee:user_profiles!task_checklist_items_assignee_id_fkey(id, name, avatar_url)
         )
       ),
       task_comments(
