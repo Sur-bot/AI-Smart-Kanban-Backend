@@ -64,11 +64,11 @@ async function getTasks(filters = {}, userId) {
       created_at,
       updated_at,
       status:task_statuses(id, name, color, category, sort_order),
-      creator:users!creator_id(id, name, email, avatar_url),
-      assignee:users!assignee_id(id, name, email, avatar_url),
+      creator:user_profiles!creator_id(id, name, email, avatar_url),
+      assignee:user_profiles!assignee_id(id, name, email, avatar_url),
       task_assignees(
         user_id,
-        user:users(id, name, email, avatar_url)
+        user:user_profiles(id, name, email, avatar_url)
       ),
       task_labels(
         label_id,
@@ -234,11 +234,11 @@ async function getTaskById(taskId, userId) {
     .select(`
       *,
       status:task_statuses(*),
-      creator:users!creator_id(id, name, email, avatar_url),
-      assignee:users!assignee_id(id, name, email, avatar_url),
+      creator:user_profiles!creator_id(id, name, email, avatar_url),
+      assignee:user_profiles!assignee_id(id, name, email, avatar_url),
       task_assignees(
         user_id,
-        user:users(id, name, email, avatar_url)
+        user:user_profiles(id, name, email, avatar_url)
       ),
       task_labels(
         label_id,
@@ -256,7 +256,7 @@ async function getTaskById(taskId, userId) {
           due_date,
           sort_order,
           completed_at,
-          assignee:users!assignee_id(id, name, avatar_url)
+          assignee:user_profiles!assignee_id(id, name, avatar_url)
         )
       ),
       task_comments(
@@ -269,7 +269,7 @@ async function getTaskById(taskId, userId) {
         reactions,
         created_at,
         updated_at,
-        author:users!author_id(id, name, email, avatar_url)
+        author:user_profiles!author_id(id, name, email, avatar_url)
       ),
       task_attachments(
         id,
@@ -279,7 +279,7 @@ async function getTaskById(taskId, userId) {
         file_size,
         mime_type,
         created_at,
-        uploaded_by:users!uploaded_by(id, name)
+        uploaded_by:user_profiles!uploaded_by(id, name)
       ),
       time_logs(
         id,
@@ -290,7 +290,7 @@ async function getTaskById(taskId, userId) {
         note,
         is_billable,
         logged_at,
-        user:users!user_id(id, name, avatar_url)
+        user:user_profiles!user_id(id, name, avatar_url)
       ),
       task_activities(
         id,
@@ -300,7 +300,7 @@ async function getTaskById(taskId, userId) {
         new_value,
         metadata,
         created_at,
-        actor:users!actor_id(id, name, avatar_url)
+        actor:user_profiles!actor_id(id, name, avatar_url)
       ),
       subtasks:tasks!parent_task_id(
         id,
@@ -309,7 +309,7 @@ async function getTaskById(taskId, userId) {
         due_date,
         completed_at,
         status:task_statuses(id, name, color, category),
-        assignee:users!assignee_id(id, name, avatar_url)
+        assignee:user_profiles!assignee_id(id, name, avatar_url)
       )
     `)
     .eq('id', taskId)
@@ -403,8 +403,8 @@ async function createTask(taskData, userId) {
     .select(`
       *,
       status:task_statuses(id, name, color, category),
-      creator:users!creator_id(id, name, email, avatar_url),
-      assignee:users!assignee_id(id, name, email, avatar_url)
+      creator:user_profiles!creator_id(id, name, email, avatar_url),
+      assignee:user_profiles!assignee_id(id, name, email, avatar_url)
     `)
     .single();
 
@@ -527,7 +527,7 @@ async function addComment(taskId, commentData, userId) {
     }])
     .select(`
       *,
-      author:users!author_id(id, name, email, avatar_url)
+      author:user_profiles!author_id(id, name, email, avatar_url)
     `)
     .single();
 
@@ -602,7 +602,7 @@ async function logTime(taskId, timeData, userId) {
     }])
     .select(`
       *,
-      user:users!user_id(id, name, avatar_url)
+      user:user_profiles!user_id(id, name, avatar_url)
     `)
     .single();
 
