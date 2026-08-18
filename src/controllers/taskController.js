@@ -1,4 +1,4 @@
-const taskService = require('../services/taskService');
+﻿const taskService = require('../services/taskService');
 
 exports.getTasks = async (req, res) => {
   try {
@@ -111,5 +111,17 @@ exports.logTime = async (req, res) => {
   } catch (error) {
     console.error('[TaskController:logTime] Error:', error);
     return res.status(500).json({ error: 'Lỗi server khi ghi nhận thời gian', details: error.message });
+  }
+};
+
+exports.bulkMoveTasks = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { moves } = req.body;
+    const result = await taskService.bulkMoveTasks(moves, userId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[TaskController:bulkMoveTasks] Error:', error);
+    return res.status(500).json({ error: 'Lỗi server khi cập nhật hàng loạt', details: error.message });
   }
 };

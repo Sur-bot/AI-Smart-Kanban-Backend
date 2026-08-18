@@ -8,6 +8,7 @@ const taskController = require('../controllers/taskController');
 router.use(authenticate);
 
 // ─── Task CRUD ─────────────────────────────────────────────────────────────
+router.post('/bulk-move', requireProjectRole('owner', 'admin', 'member'), taskController.bulkMoveTasks);
 router.get('/', taskController.getTasks);
 router.post('/', requireProjectRole('owner', 'admin', 'member'), taskController.createTask);
 router.get('/:id', requireProjectRole('owner', 'admin', 'member', 'viewer'), taskController.getTaskById);
@@ -21,3 +22,4 @@ router.patch('/checklist-items/:itemId', taskController.toggleChecklistItem);
 router.post('/:id/time-logs', requireProjectRole('owner', 'admin', 'member'), taskController.logTime);
 
 module.exports = router;
+

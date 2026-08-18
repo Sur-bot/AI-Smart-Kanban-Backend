@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+﻿const supabase = require('../config/supabase');
 const projectService = require('./projectService');
 
 /**
@@ -644,7 +644,42 @@ async function logTime(taskId, timeData, userId) {
   return data;
 }
 
+
+/**
+ * Cập nhật board_column_order (và status_id) hàng loạt khi kéo thả Kanban
+ */
+async function bulkMoveTasks(moves, userId) {
+  if (!Array.isArray(moves) || moves.length === 0) {
+    throw new Error('Dữ liệu không hợp lệ');
+  }
+
+  const updates = moves.map(move => {
+    const payload = {
+      board_column_order: move.boardColumnOrder
+    };
+    if (move.statusId) {
+      payload.status_id = move.statusId;
+    }
+    
+    return supabase
+      .from('tasks')
+      .update(payload)
+      .eq('id', move.taskId)
+      .eq('is_deleted', false);
+  });
+
+  const results = await Promise.all(updates);
+  
+  const errorResult = results.find(r => r.error);
+  if (errorResult) {
+    throw errorResult.error;
+  }
+  
+  return { success: true, count: moves.length };
+}
+
 module.exports = {
+  bulkMoveTasks,
   getTasks,
   getTaskById,
   createTask,
@@ -655,3 +690,4 @@ module.exports = {
   toggleChecklistItem,
   logTime
 };
+
