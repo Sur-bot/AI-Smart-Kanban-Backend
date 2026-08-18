@@ -437,19 +437,53 @@ async function createTask(taskData, userId) {
  * Cập nhật Tác vụ
  */
 async function updateTask(taskId, updateData, userId) {
-  const allowedFields = [
-    'title', 'description', 'description_json', 'status_id',
-    'priority', 'task_type', 'start_date', 'due_date',
-    'assignee_id', 'estimated_minutes', 'actual_minutes',
-    'story_points', 'sprint_id', 'sort_order', 'board_column_order',
-    'is_archived', 'project_id', 'parent_task_id'
-  ];
+  // Map camelCase (from Angular frontend) -> snake_case (PostgreSQL columns)
+  const camelToSnake = {
+    statusId:          'status_id',
+    priority:          'priority',
+    taskType:          'task_type',
+    title:             'title',
+    description:       'description',
+    descriptionJson:   'description_json',
+    startDate:         'start_date',
+    dueDate:           'due_date',
+    assigneeId:        'assignee_id',
+    estimatedMinutes:  'estimated_minutes',
+    actualMinutes:     'actual_minutes',
+    storyPoints:       'story_points',
+    sprintId:          'sprint_id',
+    sortOrder:         'sort_order',
+    boardColumnOrder:  'board_column_order',
+    isArchived:        'is_archived',
+    projectId:         'project_id',
+    parentTaskId:      'parent_task_id',
+    // snake_case fallback (direct DB field names still accepted)
+    status_id:         'status_id',
+    task_type:         'task_type',
+    start_date:        'start_date',
+    due_date:          'due_date',
+    assignee_id:       'assignee_id',
+    estimated_minutes: 'estimated_minutes',
+    actual_minutes:    'actual_minutes',
+    story_points:      'story_points',
+    sprint_id:         'sprint_id',
+    sort_order:        'sort_order',
+    board_column_order:'board_column_order',
+    is_archived:       'is_archived',
+    project_id:        'project_id',
+    parent_task_id:    'parent_task_id',
+    description_json:  'description_json'
+  };
 
   const payload = {};
-  for (const field of allowedFields) {
-    if (updateData[field] !== undefined) {
-      payload[field] = updateData[field];
+  for (const [key, dbField] of Object.entries(camelToSnake)) {
+    if (updateData[key] !== undefined) {
+      payload[dbField] = updateData[key];
     }
+  }
+  // completedAt: set completed_at when marking as done
+  if (updateData.completedAt !== undefined) {
+    payload['completed_at'] = updateData.completedAt;
   }
 
   if (Object.keys(payload).length > 0) {
