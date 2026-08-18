@@ -678,7 +678,70 @@ async function bulkMoveTasks(moves, userId) {
   return { success: true, count: moves.length };
 }
 
+
+async function getSubtasks(taskId, userId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(`
+      id, title, status_id, priority, task_type,
+      assignee_id, assignee:user_profiles!assignee_id(id, name, avatar_url),
+      start_date, due_date, sort_order, is_archived
+    `)
+    .eq('parent_task_id', taskId)
+    .eq('is_deleted', false)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createSubtask(parentTaskId, subtaskData, userId) {
+  const payload = { ...subtaskData, parentTaskId };
+  return createTask(payload, userId);
+}
+
+
+async function getTaskActivities(taskId) {
+  const { data, error } = await supabase
+    .from('task_activities')
+    .select(`
+      id,
+      activity_type,
+      old_value,
+      new_value,
+      created_at,
+      user:user_profiles!user_id(id, name, avatar_url)
+    `)
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+
+async function addAttachment(taskId, fileData, userId) {
+  const { file_name, storage_key, file_size, mime_type, thumbnail_key, fileName, storageKey, fileSize, mimeType, thumbnailKey } = fileData;
+  const { data, error } = await supabase
+    .from('task_attachments')
+    .insert([{
+      task_id: taskId,
+      uploaded_by: userId,
+      file_name: file_name || fileName,
+      storage_key: storage_key || storageKey,
+      file_size: file_size || fileSize,
+      mime_type: mime_type || mimeType,
+      thumbnail_key: thumbnail_key || thumbnailKey
+    }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
+  addAttachment,
+  getTaskActivities,
+  getSubtasks,
+  createSubtask,
   bulkMoveTasks,
   getTasks,
   getTaskById,
@@ -690,4 +753,7 @@ module.exports = {
   toggleChecklistItem,
   logTime
 };
+
+
+
 

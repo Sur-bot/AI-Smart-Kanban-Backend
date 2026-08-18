@@ -67,3 +67,36 @@ exports.getProjectMembers = async (req, res) => {
     return res.status(500).json({ error: 'Lỗi server khi lấy thành viên', details: error.message });
   }
 };
+
+exports.createProjectStatus = async (req, res) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+    const status = await projectService.createProjectStatus(projectId, req.body);
+    return res.status(201).json(status);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi tạo status', details: error.message });
+  }
+};
+
+exports.updateProjectStatus = async (req, res) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+    const { statusId } = req.params;
+    const status = await projectService.updateProjectStatus(projectId, statusId, req.body);
+    return res.status(200).json(status);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi cập nhật status', details: error.message });
+  }
+};
+
+exports.deleteProjectStatus = async (req, res) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+    const { statusId } = req.params;
+    const { newStatusId } = req.body;
+    await projectService.deleteProjectStatus(projectId, statusId, newStatusId);
+    return res.status(200).json({ success: true, message: 'Đã xóa cột thành công' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi xóa status', details: error.message });
+  }
+};

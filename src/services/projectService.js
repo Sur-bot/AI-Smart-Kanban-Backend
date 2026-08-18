@@ -242,7 +242,51 @@ async function getProjectMembers(projectId) {
   return data || [];
 }
 
+
+async function createProjectStatus(projectId, statusData) {
+  const { name, color, sortOrder, sort_order } = statusData;
+  const order = sortOrder !== undefined ? sortOrder : sort_order;
+  const { data, error } = await supabase
+    .from('task_statuses')
+    .insert([{ project_id: projectId, name, color, sort_order: order }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function updateProjectStatus(projectId, statusId, statusData) {
+  const { name, color, sortOrder, sort_order } = statusData;
+  const payload = {};
+  if (name !== undefined) payload.name = name;
+  if (color !== undefined) payload.color = color;
+  const order = sortOrder !== undefined ? sortOrder : sort_order;
+  if (order !== undefined) payload.sort_order = order;
+  
+  const { data, error } = await supabase
+    .from('task_statuses')
+    .update(payload)
+    .eq('id', statusId)
+    .eq('project_id', projectId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+async function deleteProjectStatus(projectId, statusId, newStatusId) {
+  if (newStatusId) {
+    await supabase.from('tasks').update({ status_id: newStatusId }).eq('status_id', statusId);
+  }
+  const { error } = await supabase.from('task_statuses').delete().eq('id', statusId).eq('project_id', projectId);
+  if (error) throw error;
+  return { success: true };
+}
+
 module.exports = {
+  createProjectStatus,
+  updateProjectStatus,
+  deleteProjectStatus,
   getProjectMembers,
   getProjectLabels,
   createLabel,
@@ -252,5 +296,6 @@ module.exports = {
   getProjectStatuses,
   createProject
 };
+
 
 

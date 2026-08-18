@@ -23,3 +23,16 @@ router.post('/:id/time-logs', requireProjectRole('owner', 'admin', 'member'), ta
 
 module.exports = router;
 
+
+
+router.get('/:id/subtasks', requireProjectRole('owner', 'admin', 'member', 'viewer'), taskController.getSubtasks);
+router.post('/:id/subtasks', requireProjectRole('owner', 'admin', 'member'), taskController.createSubtask);
+
+
+
+router.get('/:id/activities', requireProjectRole('owner', 'admin', 'member', 'viewer'), taskController.getTaskActivities);
+
+
+
+router.post('/:id/attachments', requireProjectRole('owner', 'admin', 'member'), taskController.addAttachment);
+

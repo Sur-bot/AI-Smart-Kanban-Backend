@@ -21,3 +21,9 @@ router.post('/:id/labels', requireProjectRole('owner', 'admin', 'member'), proje
 
 router.get('/:id/members', requireProjectRole('owner', 'admin', 'member', 'viewer'), projectController.getProjectMembers);
 
+
+
+router.post('/:id/statuses', requireProjectRole('owner', 'admin'), projectController.createProjectStatus);
+router.patch('/:id/statuses/:statusId', requireProjectRole('owner', 'admin'), projectController.updateProjectStatus);
+router.delete('/:id/statuses/:statusId', requireProjectRole('owner', 'admin'), projectController.deleteProjectStatus);
+

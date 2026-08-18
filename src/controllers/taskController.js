@@ -125,3 +125,46 @@ exports.bulkMoveTasks = async (req, res) => {
     return res.status(500).json({ error: 'Lỗi server khi cập nhật hàng loạt', details: error.message });
   }
 };
+
+exports.getSubtasks = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const subtasks = await taskService.getSubtasks(id, userId);
+    return res.status(200).json(subtasks);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi lấy subtasks', details: error.message });
+  }
+};
+
+exports.createSubtask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const subtask = await taskService.createSubtask(id, req.body, userId);
+    return res.status(201).json(subtask);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi tạo subtask', details: error.message });
+  }
+};
+
+exports.getTaskActivities = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const activities = await taskService.getTaskActivities(id);
+    return res.status(200).json(activities);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi lấy lịch sử hoạt động', details: error.message });
+  }
+};
+
+exports.addAttachment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const attachment = await taskService.addAttachment(id, req.body, userId);
+    return res.status(201).json(attachment);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi thêm file đính kèm', details: error.message });
+  }
+};
