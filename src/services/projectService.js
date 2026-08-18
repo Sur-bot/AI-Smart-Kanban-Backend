@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+﻿const supabase = require('../config/supabase');
 
 /**
  * Lấy hoặc tự động tạo Không gian làm việc mặc định cho User
@@ -204,10 +204,53 @@ async function createProject(projectData, userId) {
   return project;
 }
 
+
+async function getProjectLabels(projectId) {
+  const { data, error } = await supabase
+    .from('labels')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createLabel(projectId, labelData) {
+  const { name, color } = labelData;
+  if (!name) throw new Error('Tên nhãn không được để trống');
+  const { data, error } = await supabase
+    .from('labels')
+    .insert([{ project_id: projectId, name: name.trim(), color: color || '#e2e8f0' }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+
+async function getProjectMembers(projectId) {
+  const { data, error } = await supabase
+    .from('project_members')
+    .select(`
+      id,
+      role,
+      user_id,
+      user:user_profiles!user_id(id, name, email, avatar_url)
+    `)
+    .eq('project_id', projectId);
+  if (error) throw error;
+  return data || [];
+}
+
 module.exports = {
+  getProjectMembers,
+  getProjectLabels,
+  createLabel,
   getOrCreateDefaultWorkspace,
   getOrCreateDefaultProject,
   getUserProjects,
   getProjectStatuses,
   createProject
 };
+
+

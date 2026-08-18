@@ -1,4 +1,4 @@
-const projectService = require('../services/projectService');
+﻿const projectService = require('../services/projectService');
 
 exports.getProjects = async (req, res) => {
   try {
@@ -35,5 +35,35 @@ exports.getProjectStatuses = async (req, res) => {
   } catch (error) {
     console.error('[ProjectController:getProjectStatuses] Error:', error);
     return res.status(500).json({ error: 'Lỗi server khi lấy danh sách trạng thái', details: error.message });
+  }
+};
+
+exports.getProjectLabels = async (req, res) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+    const labels = await projectService.getProjectLabels(projectId);
+    return res.status(200).json(labels);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi lấy labels', details: error.message });
+  }
+};
+
+exports.createLabel = async (req, res) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+    const label = await projectService.createLabel(projectId, req.body);
+    return res.status(201).json(label);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi tạo label', details: error.message });
+  }
+};
+
+exports.getProjectMembers = async (req, res) => {
+  try {
+    const projectId = req.params.projectId || req.params.id;
+    const members = await projectService.getProjectMembers(projectId);
+    return res.status(200).json(members);
+  } catch (error) {
+    return res.status(500).json({ error: 'Lỗi server khi lấy thành viên', details: error.message });
   }
 };
