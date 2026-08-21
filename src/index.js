@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
@@ -8,6 +8,8 @@ const redisConnection = require('./config/redis');
 const profileRoutes = require('./routes/profileRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const taskRoutes = require('./routes/taskRoutes');
+const storageRoutes = require('./routes/storageRoutes');
+const storageService = require('./services/storageService');
 
 const app = express();
 
@@ -21,28 +23,27 @@ app.use(express.json());
 app.use(cookieParser());
 
 // API routes
-// Auth (đăng ký, đăng nhập, đăng xuất) được xử lý bởi Supabase phía Frontend.
-// Backend chỉ xử lý nghiệp vụ sau khi đã xác thực JWT.
 app.use('/api/profile', profileRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/storage', storageRoutes);
 
 const imageQueue = new Queue('image-processing', { connection: redisConnection });
 
 app.post('/api/jobs/process-image', async (req, res) => {
   try {
-    const { fileId, storageKey } = req.body;
+    const { fileId, storageKey, userId } = req.body;
     
     if (!fileId || !storageKey) {
       return res.status(400).json({ error: 'Thiếu fileId hoặc storageKey' });
     }
 
-    await imageQueue.add('optimize-image', { fileId, storageKey }, {
+    await imageQueue.add('optimize-image', { fileId, storageKey, userId }, {
       removeOnComplete: true,
       removeOnFail: false,
     });
 
-    console.log(`[API] Job queued: ${fileId}`);
+    console.log(`[API] Job queued: ${fileId} (User: ${userId || 'unknown'})`);
     return res.status(200).json({ message: 'Đã đưa vào hàng đợi xử lý', fileId });
 
   } catch (error) {
@@ -60,7 +61,7 @@ app.delete('/api/jobs/image/:id', async (req, res) => {
     // 1. Lấy thông tin ảnh từ DB
     const { data: fileData, error: fetchError } = await supabase
       .from('storage_files')
-      .select('storage_key, thumbnail_key')
+      .select('storage_key, thumbnail_key, user_id, size_bytes')
       .eq('id', fileId)
       .single();
 
@@ -86,6 +87,11 @@ app.delete('/api/jobs/image/:id', async (req, res) => {
         .remove(keysToDelete);
         
       if (storageError) console.warn('[API] Lỗi xóa vật lý từ Storage:', storageError.message);
+
+      // 4. Đồng bộ giảm Quota người dùng
+      if (fileData.user_id) {
+        await storageService.recalculateUserQuota(fileData.user_id);
+      }
     }
 
     console.log(`[API] Deleted: ${fileId}`);
