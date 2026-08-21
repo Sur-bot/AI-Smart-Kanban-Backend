@@ -1,4 +1,4 @@
-const supabase = require('../config/supabase');
+﻿const supabase = require('../config/supabase');
 const projectService = require('./projectService');
 
 /**
@@ -437,19 +437,53 @@ async function createTask(taskData, userId) {
  * Cập nhật Tác vụ
  */
 async function updateTask(taskId, updateData, userId) {
-  const allowedFields = [
-    'title', 'description', 'description_json', 'status_id',
-    'priority', 'task_type', 'start_date', 'due_date',
-    'assignee_id', 'estimated_minutes', 'actual_minutes',
-    'story_points', 'sprint_id', 'sort_order', 'board_column_order',
-    'is_archived', 'project_id', 'parent_task_id'
-  ];
+  // Map camelCase (from Angular frontend) -> snake_case (PostgreSQL columns)
+  const camelToSnake = {
+    statusId:          'status_id',
+    priority:          'priority',
+    taskType:          'task_type',
+    title:             'title',
+    description:       'description',
+    descriptionJson:   'description_json',
+    startDate:         'start_date',
+    dueDate:           'due_date',
+    assigneeId:        'assignee_id',
+    estimatedMinutes:  'estimated_minutes',
+    actualMinutes:     'actual_minutes',
+    storyPoints:       'story_points',
+    sprintId:          'sprint_id',
+    sortOrder:         'sort_order',
+    boardColumnOrder:  'board_column_order',
+    isArchived:        'is_archived',
+    projectId:         'project_id',
+    parentTaskId:      'parent_task_id',
+    // snake_case fallback (direct DB field names still accepted)
+    status_id:         'status_id',
+    task_type:         'task_type',
+    start_date:        'start_date',
+    due_date:          'due_date',
+    assignee_id:       'assignee_id',
+    estimated_minutes: 'estimated_minutes',
+    actual_minutes:    'actual_minutes',
+    story_points:      'story_points',
+    sprint_id:         'sprint_id',
+    sort_order:        'sort_order',
+    board_column_order:'board_column_order',
+    is_archived:       'is_archived',
+    project_id:        'project_id',
+    parent_task_id:    'parent_task_id',
+    description_json:  'description_json'
+  };
 
   const payload = {};
-  for (const field of allowedFields) {
-    if (updateData[field] !== undefined) {
-      payload[field] = updateData[field];
+  for (const [key, dbField] of Object.entries(camelToSnake)) {
+    if (updateData[key] !== undefined) {
+      payload[dbField] = updateData[key];
     }
+  }
+  // completedAt: set completed_at when marking as done
+  if (updateData.completedAt !== undefined) {
+    payload['completed_at'] = updateData.completedAt;
   }
 
   if (Object.keys(payload).length > 0) {
@@ -610,7 +644,105 @@ async function logTime(taskId, timeData, userId) {
   return data;
 }
 
+
+/**
+ * Cập nhật board_column_order (và status_id) hàng loạt khi kéo thả Kanban
+ */
+async function bulkMoveTasks(moves, userId) {
+  if (!Array.isArray(moves) || moves.length === 0) {
+    throw new Error('Dữ liệu không hợp lệ');
+  }
+
+  const updates = moves.map(move => {
+    const payload = {
+      board_column_order: move.boardColumnOrder
+    };
+    if (move.statusId) {
+      payload.status_id = move.statusId;
+    }
+    
+    return supabase
+      .from('tasks')
+      .update(payload)
+      .eq('id', move.taskId)
+      .eq('is_deleted', false);
+  });
+
+  const results = await Promise.all(updates);
+  
+  const errorResult = results.find(r => r.error);
+  if (errorResult) {
+    throw errorResult.error;
+  }
+  
+  return { success: true, count: moves.length };
+}
+
+
+async function getSubtasks(taskId, userId) {
+  const { data, error } = await supabase
+    .from('tasks')
+    .select(`
+      id, title, status_id, priority, task_type,
+      assignee_id, assignee:user_profiles!assignee_id(id, name, avatar_url),
+      start_date, due_date, sort_order, is_archived
+    `)
+    .eq('parent_task_id', taskId)
+    .eq('is_deleted', false)
+    .order('sort_order', { ascending: true });
+  if (error) throw error;
+  return data || [];
+}
+
+async function createSubtask(parentTaskId, subtaskData, userId) {
+  const payload = { ...subtaskData, parentTaskId };
+  return createTask(payload, userId);
+}
+
+
+async function getTaskActivities(taskId) {
+  const { data, error } = await supabase
+    .from('task_activities')
+    .select(`
+      id,
+      activity_type,
+      old_value,
+      new_value,
+      created_at,
+      user:user_profiles!user_id(id, name, avatar_url)
+    `)
+    .eq('task_id', taskId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+
+async function addAttachment(taskId, fileData, userId) {
+  const { file_name, storage_key, file_size, mime_type, thumbnail_key, fileName, storageKey, fileSize, mimeType, thumbnailKey } = fileData;
+  const { data, error } = await supabase
+    .from('task_attachments')
+    .insert([{
+      task_id: taskId,
+      uploaded_by: userId,
+      file_name: file_name || fileName,
+      storage_key: storage_key || storageKey,
+      file_size: file_size || fileSize,
+      mime_type: mime_type || mimeType,
+      thumbnail_key: thumbnail_key || thumbnailKey
+    }])
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
+  addAttachment,
+  getTaskActivities,
+  getSubtasks,
+  createSubtask,
+  bulkMoveTasks,
   getTasks,
   getTaskById,
   createTask,
@@ -621,3 +753,7 @@ module.exports = {
   toggleChecklistItem,
   logTime
 };
+
+
+
+
