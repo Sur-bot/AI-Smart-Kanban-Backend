@@ -20,6 +20,8 @@ router.post('/:id/labels', requireProjectRole('owner', 'admin', 'member'), proje
 
 
 router.get('/:id/members', requireProjectRole('owner', 'admin', 'member', 'viewer'), projectController.getProjectMembers);
+router.post('/:id/members', requireProjectRole('owner', 'admin'), projectController.addMember);
+router.patch('/:id/members/:memberId', requireProjectRole('owner', 'admin'), projectController.updateMemberJobRole);
 
 
 

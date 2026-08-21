@@ -100,3 +100,31 @@ exports.deleteProjectStatus = async (req, res) => {
     return res.status(500).json({ error: 'Lỗi server khi xóa status', details: error.message });
   }
 };
+
+exports.addMember = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { userId, role, jobRole } = req.body;
+    if (!userId) {
+      return res.status(400).json({ error: 'userId la bat buoc' });
+    }
+    const member = await projectService.addMemberToProject(projectId, { userId, role, jobRole });
+    return res.status(201).json(member);
+  } catch (error) {
+    console.error('[ProjectController:addMember] Error:', error);
+    return res.status(500).json({ error: 'Loi server khi them thanh vien', details: error.message });
+  }
+};
+
+exports.updateMemberJobRole = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { memberId } = req.params;
+    const { jobRole } = req.body;
+    const member = await projectService.updateMemberJobRole(projectId, memberId, jobRole ?? null);
+    return res.status(200).json(member);
+  } catch (error) {
+    console.error('[ProjectController:updateMemberJobRole] Error:', error);
+    return res.status(500).json({ error: 'Loi server khi cap nhat job_role', details: error.message });
+  }
+};

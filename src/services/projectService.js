@@ -234,10 +234,13 @@ async function getProjectMembers(projectId) {
     .select(`
       id,
       role,
+      job_role,
       user_id,
+      created_at,
       user:user_profiles!user_id(id, name, email, avatar_url)
     `)
-    .eq('project_id', projectId);
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true });
   if (error) throw error;
   return data || [];
 }
@@ -283,11 +286,63 @@ async function deleteProjectStatus(projectId, statusId, newStatusId) {
   return { success: true };
 }
 
+
+/**
+ * Them thanh vien vao du an
+ */
+async function addMemberToProject(projectId, { userId, role = 'member', jobRole = null }) {
+  const VALID_JOB_ROLES = ['PM', 'FE', 'BE', 'QA', 'DevOps', 'Designer', 'Mobile', 'DataAnalyst', 'Other'];
+  if (jobRole && !VALID_JOB_ROLES.includes(jobRole)) {
+    throw new Error(`job_role khong hop le. Cac gia tri cho phep: ${VALID_JOB_ROLES.join(', ')}`);
+  }
+  const { data, error } = await supabase
+    .from('project_members')
+    .insert([{ project_id: projectId, user_id: userId, role, job_role: jobRole }])
+    .select(`
+      id,
+      role,
+      job_role,
+      user_id,
+      created_at,
+      user:user_profiles!user_id(id, name, email, avatar_url)
+    `)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Cap nhat job_role cua mot thanh vien trong du an
+ */
+async function updateMemberJobRole(projectId, memberId, jobRole) {
+  const VALID_JOB_ROLES = ['PM', 'FE', 'BE', 'QA', 'DevOps', 'Designer', 'Mobile', 'DataAnalyst', 'Other'];
+  if (jobRole !== null && !VALID_JOB_ROLES.includes(jobRole)) {
+    throw new Error(`job_role khong hop le. Cac gia tri cho phep: ${VALID_JOB_ROLES.join(', ')}`);
+  }
+  const { data, error } = await supabase
+    .from('project_members')
+    .update({ job_role: jobRole })
+    .eq('id', memberId)
+    .eq('project_id', projectId)
+    .select(`
+      id,
+      role,
+      job_role,
+      user_id,
+      user:user_profiles!user_id(id, name, email, avatar_url)
+    `)
+    .single();
+  if (error) throw error;
+  return data;
+}
+
 module.exports = {
   createProjectStatus,
   updateProjectStatus,
   deleteProjectStatus,
   getProjectMembers,
+  addMemberToProject,
+  updateMemberJobRole,
   getProjectLabels,
   createLabel,
   getOrCreateDefaultWorkspace,
