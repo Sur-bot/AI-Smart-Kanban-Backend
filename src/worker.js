@@ -67,6 +67,13 @@ const worker = new Worker('image-processing', async (job) => {
     if (uploadThumbError) throw uploadThumbError;
 
     // 6. Cập nhật metadata hoàn chỉnh vào DB
+    const { data: checkDeleted } = await supabase.from('storage_files').select('is_deleted').eq('id', fileId).single();
+    if (checkDeleted && checkDeleted.is_deleted) {
+      await supabase.storage.from(BUCKET_NAME).remove([newStorageKey, thumbnailKey]);
+      console.log(`[Worker] File ${fileId} đã bị xóa trước khi hoàn thành. Đã dọn dẹp WebP.`);
+      return { success: true, message: 'File was deleted during processing' };
+    }
+
     const { error: dbError } = await supabase
       .from('storage_files')
       .update({
