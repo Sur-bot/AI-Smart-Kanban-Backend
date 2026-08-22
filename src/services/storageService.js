@@ -59,8 +59,9 @@ async function recalculateUserQuota(userId) {
 
   const fileCount = files ? files.length : 0;
   const usedBytes = (files || []).reduce((acc, curr) => acc + (parseInt(curr.size_bytes, 10) || 0), 0);
-  const quotaBytes = DEFAULT_QUOTA_BYTES;
-  const percentage = Math.min(100, Math.round((usedBytes / quotaBytes) * 100));
+  const { data: existingQuota } = await supabase.from('user_storage_quotas').select('quota_bytes').eq('user_id', userId).single();
+  const quotaBytes = existingQuota && existingQuota.quota_bytes ? parseInt(existingQuota.quota_bytes, 10) : DEFAULT_QUOTA_BYTES;
+  const percentage = quotaBytes > 0 ? Math.min(100, Math.round((usedBytes / quotaBytes) * 100)) : 0;
 
   // Lưu hoặc cập nhật vào bảng user_storage_quotas
   const { data: upsertData, error: upsertError } = await supabase
