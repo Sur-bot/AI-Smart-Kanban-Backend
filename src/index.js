@@ -115,8 +115,5 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`[Server] Backend API running on port ${PORT}`);
   
-  // Chỉ tự động chạy Worker nếu đang ở môi trường phát triển (Local)
-  if (process.env.NODE_ENV !== 'production' && !process.env.DISABLE_EMBEDDED_WORKER) {
-    require('./worker');
-  }
+  require('./worker');
 });
