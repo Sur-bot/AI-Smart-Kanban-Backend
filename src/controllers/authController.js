@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const supabase = require('../config/supabase');
 const { sendVerificationEmail } = require('../services/emailService');
+const projectService = require('../services/projectService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'supersecret_for_development_only';
 const JWT_EXPIRES_IN = '15m'; // Access token sống 15 phút
@@ -60,7 +61,11 @@ exports.register = async (req, res) => {
 
     if (insertError) throw insertError;
 
-    // 4. Gửi email xác minh (chạy ngầm không block response)
+    // 4. Tạo Workspace và Project mặc định cho user mới
+    const ws = await projectService.getOrCreateDefaultWorkspace(newUser.id);
+    await projectService.getOrCreateDefaultProject(ws.id, newUser.id);
+
+    // 5. Gửi email xác minh (chạy ngầm không block response)
     sendVerificationEmail(email, verificationToken);
 
     // 5. Trả về thành công
