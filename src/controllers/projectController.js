@@ -128,3 +128,97 @@ exports.updateMemberJobRole = async (req, res) => {
     return res.status(500).json({ error: 'Loi server khi cap nhat job_role', details: error.message });
   }
 };
+
+
+// -- Project Management --------------------------------------------------------
+
+exports.updateProject = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const project = await projectService.updateProject(projectId, req.body);
+    return res.status(200).json(project);
+  } catch (error) {
+    console.error('[ProjectController:updateProject] Error:', error);
+    return res.status(500).json({ error: 'Error updating project', details: error.message });
+  }
+};
+
+exports.deleteProject = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    await projectService.deleteProject(projectId);
+    return res.status(200).json({ success: true, message: 'Project deleted' });
+  } catch (error) {
+    console.error('[ProjectController:deleteProject] Error:', error);
+    return res.status(500).json({ error: 'Error deleting project', details: error.message });
+  }
+};
+
+exports.archiveProject = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { archive = true } = req.body;
+    const project = await projectService.archiveProject(projectId, archive);
+    return res.status(200).json(project);
+  } catch (error) {
+    console.error('[ProjectController:archiveProject] Error:', error);
+    return res.status(500).json({ error: 'Error archiving project', details: error.message });
+  }
+};
+
+// -- Member Management ---------------------------------------------------------
+
+exports.updateMemberRole = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { memberId } = req.params;
+    const { role } = req.body;
+    if (!role) return res.status(400).json({ error: 'role is required' });
+    const member = await projectService.updateMemberRole(projectId, memberId, role, req.userRole);
+    return res.status(200).json(member);
+  } catch (error) {
+    const statusCode = error.message.includes('cannot') || error.message.includes('Cannot') ? 403 : 500;
+    console.error('[ProjectController:updateMemberRole] Error:', error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+};
+
+exports.removeMember = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const { memberId } = req.params;
+    const result = await projectService.removeMember(projectId, memberId, req.userRole);
+    return res.status(200).json(result);
+  } catch (error) {
+    const statusCode = error.message.includes('cannot') || error.message.includes('Cannot') ? 403 : 500;
+    console.error('[ProjectController:removeMember] Error:', error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+};
+
+exports.leaveProject = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const userId = req.user.id;
+    const result = await projectService.leaveProject(projectId, userId);
+    return res.status(200).json(result);
+  } catch (error) {
+    const statusCode = error.message.includes('cannot') || error.message.includes('Cannot') ? 403 : 500;
+    console.error('[ProjectController:leaveProject] Error:', error);
+    return res.status(statusCode).json({ error: error.message });
+  }
+};
+
+exports.transferOwnership = async (req, res) => {
+  try {
+    const projectId = req.params.id;
+    const currentOwnerUserId = req.user.id;
+    const { newOwnerUserId } = req.body;
+    if (!newOwnerUserId) return res.status(400).json({ error: 'newOwnerUserId is required' });
+    const result = await projectService.transferOwnership(projectId, newOwnerUserId, currentOwnerUserId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[ProjectController:transferOwnership] Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+};
