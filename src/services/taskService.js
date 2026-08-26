@@ -1,4 +1,4 @@
-﻿const supabase = require('../config/supabase');
+const supabase = require('../config/supabase');
 const projectService = require('./projectService');
 
 /**
@@ -377,7 +377,22 @@ async function createTask(taskData, userId) {
     targetStatusId = defaultStatus.id;
   }
 
+  // 3.5. Validate assignees are project members
+  const allAssigneeIds = [...(assigneeIds || [])];
+  if (assigneeId && !allAssigneeIds.includes(assigneeId)) {
+    allAssigneeIds.push(assigneeId);
+  }
+  if (allAssigneeIds.length > 0) {
+    for (const aId of allAssigneeIds) {
+      const isMember = await projectService.isProjectMember(targetProjectId, aId);
+      if (!isMember) {
+        throw new Error(`User ${aId} is not a member of this project. Cannot assign task.`);
+      }
+    }
+  }
+
   // 4. Insert Task
+
   const { data: createdTask, error: insertError } = await supabase
     .from('tasks')
     .insert([{

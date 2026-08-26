@@ -336,21 +336,187 @@ async function updateMemberJobRole(projectId, memberId, jobRole) {
   return data;
 }
 
+/**
+ * Update project info (name, description, color, icon, dates, visibility)
+ */
+async function updateProject(projectId, updateData) {
+  const allowedFields = ['name', 'description', 'color', 'icon', 'cover_url', 'start_date', 'end_date', 'is_public'];
+  const payload = {};
+  for (const field of allowedFields) {
+    if (updateData[field] !== undefined) {
+      payload[field] = updateData[field];
+    }
+  }
+  if (updateData.coverUrl !== undefined) payload.cover_url = updateData.coverUrl;
+  if (updateData.startDate !== undefined) payload.start_date = updateData.startDate;
+  if (updateData.endDate !== undefined) payload.end_date = updateData.endDate;
+  if (updateData.isPublic !== undefined) payload.is_public = updateData.isPublic;
+
+  if (Object.keys(payload).length === 0) {
+    throw new Error('No valid fields to update');
+  }
+
+  const { data, error } = await supabase
+    .from('projects')
+    .update(payload)
+    .eq('id', projectId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Soft-delete a project (only owner)
+ */
+async function deleteProject(projectId) {
+  const { error } = await supabase
+    .from('projects')
+    .update({ status: 'archived', deleted_at: new Date().toISOString() })
+    .eq('id', projectId);
+  if (error) throw error;
+  return { success: true };
+}
+
+/**
+ * Archive/unarchive a project
+ */
+async function archiveProject(projectId, archive = true) {
+  const newStatus = archive ? 'archived' : 'active';
+  const { data, error } = await supabase
+    .from('projects')
+    .update({ status: newStatus })
+    .eq('id', projectId)
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Remove a member from a project.
+ * Guards: Cannot remove owner; Admin cannot remove another admin
+ */
+async function removeMember(projectId, memberId, requestingUserRole) {
+  const { data: target, error: fetchErr } = await supabase
+    .from('project_members')
+    .select('id, role, user_id')
+    .eq('id', memberId)
+    .eq('project_id', projectId)
+    .single();
+
+  if (fetchErr || !target) throw new Error('Member not found in this project');
+  if (target.role === 'owner') throw new Error('Cannot remove the project owner. Transfer ownership first.');
+  if (requestingUserRole === 'admin' && target.role === 'admin') {
+    throw new Error('Admin cannot remove another admin. Only the owner can do this.');
+  }
+
+  const { error } = await supabase
+    .from('project_members')
+    .delete()
+    .eq('id', memberId)
+    .eq('project_id', projectId);
+  if (error) throw error;
+  return { success: true, removedUserId: target.user_id };
+}
+
+/**
+ * Change a member's project role.
+ * Guards: Cannot change owner role; Admin cannot change another admin
+ */
+async function updateMemberRole(projectId, memberId, newRole, requestingUserRole) {
+  const VALID_ROLES = ['admin', 'member', 'viewer'];
+  if (!VALID_ROLES.includes(newRole)) {
+    throw new Error('Invalid role. Allowed: ' + VALID_ROLES.join(', '));
+  }
+
+  const { data: target, error: fetchErr } = await supabase
+    .from('project_members')
+    .select('id, role, user_id')
+    .eq('id', memberId)
+    .eq('project_id', projectId)
+    .single();
+
+  if (fetchErr || !target) throw new Error('Member not found in this project');
+  if (target.role === 'owner') throw new Error('Cannot change the owner role. Use transfer ownership instead.');
+  if (requestingUserRole === 'admin' && target.role === 'admin') {
+    throw new Error('Admin cannot change another admin role.');
+  }
+
+  const { data, error } = await supabase
+    .from('project_members')
+    .update({ role: newRole })
+    .eq('id', memberId)
+    .eq('project_id', projectId)
+    .select('id, role, job_role, user_id, created_at, user:user_profiles!user_id(id, name, email, avatar_url)')
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Leave a project (self-removal). Owner cannot leave.
+ */
+async function leaveProject(projectId, userId) {
+  const { data: member, error: fetchErr } = await supabase
+    .from('project_members')
+    .select('id, role')
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .single();
+
+  if (fetchErr || !member) throw new Error('You are not a member of this project');
+  if (member.role === 'owner') throw new Error('Owner cannot leave. Transfer ownership first.');
+
+  const { error } = await supabase
+    .from('project_members')
+    .delete()
+    .eq('id', member.id);
+  if (error) throw error;
+  return { success: true };
+}
+
+/**
+ * Transfer project ownership. Current owner becomes admin, target becomes owner.
+ */
+async function transferOwnership(projectId, newOwnerUserId, currentOwnerUserId) {
+  const { data: targetMember, error: targetErr } = await supabase
+    .from('project_members')
+    .select('id, role')
+    .eq('project_id', projectId)
+    .eq('user_id', newOwnerUserId)
+    .single();
+
+  if (targetErr || !targetMember) throw new Error('Target user is not a member of this project');
+
+  await supabase.from('project_members').update({ role: 'admin' })
+    .eq('project_id', projectId).eq('user_id', currentOwnerUserId);
+  await supabase.from('project_members').update({ role: 'owner' })
+    .eq('project_id', projectId).eq('user_id', newOwnerUserId);
+  await supabase.from('projects').update({ owner_id: newOwnerUserId }).eq('id', projectId);
+
+  return { success: true, newOwnerId: newOwnerUserId };
+}
+
+/**
+ * Check if a user is a member of a project (for assignee validation)
+ */
+async function isProjectMember(projectId, userId) {
+  const { data, error } = await supabase
+    .from('project_members')
+    .select('id')
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
+    .single();
+  return !error && !!data;
+}
+
 module.exports = {
-  createProjectStatus,
-  updateProjectStatus,
-  deleteProjectStatus,
-  getProjectMembers,
-  addMemberToProject,
-  updateMemberJobRole,
-  getProjectLabels,
-  createLabel,
-  getOrCreateDefaultWorkspace,
-  getOrCreateDefaultProject,
-  getUserProjects,
-  getProjectStatuses,
-  createProject
+  createProjectStatus, updateProjectStatus, deleteProjectStatus,
+  getProjectMembers, addMemberToProject, updateMemberJobRole,
+  updateMemberRole, removeMember, leaveProject, transferOwnership,
+  getProjectLabels, createLabel,
+  getOrCreateDefaultWorkspace, getOrCreateDefaultProject,
+  getUserProjects, getProjectStatuses, createProject,
+  updateProject, deleteProject, archiveProject, isProjectMember
 };
-
-
-
