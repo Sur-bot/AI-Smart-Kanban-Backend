@@ -1,15 +1,9 @@
 const supabase = require('../config/supabase');
 
-/**
- * Lấy thông tin profile của user hiện tại
- * Auth (đăng ký, đăng nhập, đăng xuất, refresh token) được xử lý hoàn toàn
- * bởi Supabase Auth phía Frontend (supabase-js). Backend không cần can thiệp.
- */
 exports.getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // Lấy metadata bổ sung từ auth.users nếu cần
     const { data: { user }, error } = await supabase.auth.admin.getUserById(userId);
 
     if (error || !user) {
@@ -21,6 +15,7 @@ exports.getProfile = async (req, res) => {
       email: user.email,
       name: user.user_metadata?.full_name || user.email,
       avatar_url: user.user_metadata?.avatar_url || null,
+      preferences: user.user_metadata?.preferences || {},
       created_at: user.created_at,
       last_sign_in_at: user.last_sign_in_at,
     });
@@ -30,17 +25,15 @@ exports.getProfile = async (req, res) => {
   }
 };
 
-/**
- * Cập nhật thông tin profile (tên, avatar)
- */
 exports.updateProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    const { fullName, avatarUrl } = req.body;
+    const { fullName, avatarUrl, preferences } = req.body;
 
     const updateData = { data: {} };
     if (fullName) updateData.data.full_name = fullName;
     if (avatarUrl) updateData.data.avatar_url = avatarUrl;
+    if (preferences !== undefined) updateData.data.preferences = preferences;
 
     const { data: { user }, error } = await supabase.auth.admin.updateUserById(userId, updateData);
 
@@ -51,6 +44,7 @@ exports.updateProfile = async (req, res) => {
       email: user.email,
       name: user.user_metadata?.full_name,
       avatar_url: user.user_metadata?.avatar_url,
+      preferences: user.user_metadata?.preferences || {},
     });
   } catch (error) {
     console.error('[ProfileController:updateProfile] Error:', error.message);
