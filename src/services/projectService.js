@@ -89,6 +89,18 @@ async function getOrCreateDefaultProject(workspaceId, userId) {
  * Lấy danh sách dự án của người dùng
  */
 async function getUserProjects(userId, workspaceId = null) {
+  if (!userId) return [];
+
+  // 1. Lấy danh sách project_id mà user được mời làm thành viên
+  const { data: memberRows, error: memberError } = await supabase
+    .from('project_members')
+    .select('project_id')
+    .eq('user_id', userId);
+
+  if (memberError) throw memberError;
+  const memberProjectIds = (memberRows || []).map(r => r.project_id).filter(Boolean);
+
+  // 2. Lấy danh sách dự án: user là owner_id HOẶC id nằm trong memberProjectIds
   let query = supabase
     .from('projects')
     .select(`
@@ -115,6 +127,12 @@ async function getUserProjects(userId, workspaceId = null) {
 
   if (workspaceId) {
     query = query.eq('workspace_id', workspaceId);
+  }
+
+  if (memberProjectIds.length > 0) {
+    query = query.or(`owner_id.eq.${userId},id.in.(${memberProjectIds.join(',')})`);
+  } else {
+    query = query.eq('owner_id', userId);
   }
 
   const { data, error } = await query;
@@ -502,6 +520,15 @@ async function transferOwnership(projectId, newOwnerUserId, currentOwnerUserId) 
  * Check if a user is a member of a project (for assignee validation)
  */
 async function isProjectMember(projectId, userId) {
+  if (!projectId || !userId) return false;
+  const { data: project } = await supabase
+    .from('projects')
+    .select('owner_id')
+    .eq('id', projectId)
+    .single();
+
+  if (project && project.owner_id === userId) return true;
+
   const { data, error } = await supabase
     .from('project_members')
     .select('id')
