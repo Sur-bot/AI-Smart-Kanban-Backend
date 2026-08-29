@@ -118,8 +118,11 @@ async function getUserProjects(userId, workspaceId = null) {
       is_public,
       created_at,
       project_members (
+        id,
         user_id,
-        role
+        role,
+        job_role,
+        user:user_profiles!user_id(id, name, email, avatar_url)
       )
     `)
     .neq('status', 'archived')
