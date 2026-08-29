@@ -254,11 +254,11 @@ async function getProjectMembers(projectId) {
       role,
       job_role,
       user_id,
-      created_at,
+      joined_at,
       user:user_profiles!user_id(id, name, email, avatar_url)
     `)
     .eq('project_id', projectId)
-    .order('created_at', { ascending: true });
+    .order('joined_at', { ascending: true });
   if (error) throw error;
   return data || [];
 }
@@ -321,7 +321,7 @@ async function addMemberToProject(projectId, { userId, role = 'member', jobRole 
       role,
       job_role,
       user_id,
-      created_at,
+      joined_at,
       user:user_profiles!user_id(id, name, email, avatar_url)
     `)
     .single();
@@ -347,6 +347,7 @@ async function updateMemberJobRole(projectId, memberId, jobRole) {
       role,
       job_role,
       user_id,
+      joined_at,
       user:user_profiles!user_id(id, name, email, avatar_url)
     `)
     .single();
@@ -466,7 +467,7 @@ async function updateMemberRole(projectId, memberId, newRole, requestingUserRole
     .update({ role: newRole })
     .eq('id', memberId)
     .eq('project_id', projectId)
-    .select('id, role, job_role, user_id, created_at, user:user_profiles!user_id(id, name, email, avatar_url)')
+    .select('id, role, job_role, user_id, joined_at, user:user_profiles!user_id(id, name, email, avatar_url)')
     .single();
   if (error) throw error;
   return data;
