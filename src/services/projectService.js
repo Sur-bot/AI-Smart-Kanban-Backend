@@ -176,9 +176,14 @@ async function createProject(projectData, userId) {
     description = '',
     color = '#3b82f6',
     icon = 'folder',
-    startDate = null,
-    endDate = null,
-    isPublic = false
+    theme_url = null,
+    start_date = null,
+    end_date = null,
+    project_type = 'project',
+    privacy = 'public',
+    tags = [],
+    enabled_tools = {kanban:true,task_list:true,gantt:true,calendar:true,drive:false,chat:false},
+    initial_members = []
   } = projectData;
 
   let targetWorkspaceId = workspaceId;
@@ -196,9 +201,13 @@ async function createProject(projectData, userId) {
       description,
       color,
       icon,
-      start_date: startDate,
-      end_date: endDate,
-      is_public: isPublic,
+      theme_url,
+      start_date,
+      end_date,
+      project_type,
+      privacy,
+      tags,
+      enabled_tools,
       owner_id: userId,
       status: 'active'
     }])
@@ -207,14 +216,27 @@ async function createProject(projectData, userId) {
 
   if (createError) throw createError;
 
-  // 2. Gán thành viên owner
-  await supabase
-    .from('project_members')
-    .insert([{
+  // 2. Gán thành viên 
+  // Map initial_members if provided, otherwise default to owner
+  let membersToInsert = initial_members.map(m => ({
+    project_id: project.id,
+    user_id: m.user_id,
+    role: m.role
+  }));
+
+  if (membersToInsert.length === 0) {
+    membersToInsert = [{
       project_id: project.id,
       user_id: userId,
       role: 'owner'
-    }]);
+    }];
+  }
+
+  const { error: membersError } = await supabase
+    .from('project_members')
+    .insert(membersToInsert);
+
+  if (membersError) console.error('[projectService:createProject] Error inserting members:', membersError.message);
 
   // 3. Khởi tạo statuses
   await supabase.rpc('seed_default_statuses', { p_project_id: project.id });
@@ -548,3 +570,4 @@ module.exports = {
   getUserProjects, getProjectStatuses, createProject,
   updateProject, deleteProject, archiveProject, isProjectMember
 };
+
