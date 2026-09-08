@@ -9,7 +9,8 @@ const { authenticate } = require("./middleware/auth");
 const profileRoutes = require("./routes/profileRoutes");
 const projectRoutes = require("./routes/projectRoutes");
 const taskRoutes = require("./routes/taskRoutes");
-const storageRoutes = require("./routes/storageRoutes");
+const storageRoutes = require('./routes/storageRoutes');
+const userRoutes = require('./routes/userRoutes');
 const storageService = require("./services/storageService");
 
 const app = express();
@@ -35,7 +36,8 @@ app.use(cookieParser());
 app.use("/api/profile", profileRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tasks", taskRoutes);
-app.use("/api/storage", storageRoutes);
+app.use('/api/storage', storageRoutes);
+app.use('/api/users', userRoutes);
 
 const imageQueue = new Queue("image-processing", { connection: redisConnection });
 
@@ -134,3 +136,6 @@ app.listen(PORT, () => {
   console.log(`[Server] Backend API running on port ${PORT}`);
   require("./worker");
 });
+
+
+
