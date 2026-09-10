@@ -1,4 +1,4 @@
-﻿require("dotenv").config();
+require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -15,7 +15,6 @@ const storageService = require("./services/storageService");
 
 const app = express();
 
-// FIX: CORS with explicit method/header restriction
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin || /^http:\/\/localhost:\d+$/.test(origin) || origin === process.env.FRONTEND_URL) {
@@ -26,7 +25,7 @@ app.use(cors({
   },
   credentials: true,
   methods: ["GET", "POST", "PATCH", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info", "Accept", "Origin", "X-Requested-With"]
 }));
 
 app.use(express.json());
@@ -41,7 +40,6 @@ app.use('/api/users', userRoutes);
 
 const imageQueue = new Queue("image-processing", { connection: redisConnection });
 
-// FIX: Added authenticate middleware to prevent unauthorized job injection (DDoS risk)
 app.post("/api/jobs/process-image", authenticate, async (req, res) => {
   try {
     const { fileId, storageKey, userId } = req.body;
@@ -64,7 +62,6 @@ app.post("/api/jobs/process-image", authenticate, async (req, res) => {
   }
 });
 
-// FIX: Added authenticate + ownership verification to prevent unauthorized image deletion
 app.delete("/api/jobs/image/:id", authenticate, async (req, res) => {
   try {
     const fileId = req.params.id;
@@ -83,7 +80,6 @@ app.delete("/api/jobs/image/:id", authenticate, async (req, res) => {
       return res.status(404).json({ error: "File not found" });
     }
 
-    // FIX: Ownership check — only the file owner can delete it
     if (fileData.user_id && fileData.user_id !== requestingUserId) {
       return res.status(403).json({ error: "Forbidden", message: "You do not have permission to delete this file" });
     }
@@ -122,7 +118,6 @@ app.delete("/api/jobs/image/:id", authenticate, async (req, res) => {
   }
 });
 
-// FIX: Global Express error handler — catches uncaught errors in middleware/routes
 app.use((err, req, res, _next) => {
   console.error("[Global Error Handler]:", err.message);
   if (err.message === "Not allowed by CORS") {
