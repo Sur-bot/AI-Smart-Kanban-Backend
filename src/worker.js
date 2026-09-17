@@ -11,6 +11,12 @@ const worker = new Worker('image-processing', async (job) => {
   console.log(`[Worker] Bắt đầu tối ưu ảnh: ${fileId} (${storageKey})`);
 
   try {
+    const { data: preCheck } = await supabase.from('storage_files').select('is_deleted').eq('id', fileId).single();
+    if (preCheck && preCheck.is_deleted) {
+      console.log("[Worker] Bỏ qua  vì đã bị xóa trong DB.");
+      return { success: true, message: 'File was deleted before processing' };
+    }
+
     // 1. Tải ảnh gốc từ Supabase Storage
     const { data: fileData, error: downloadError } = await supabase.storage
       .from(BUCKET_NAME)
