@@ -113,6 +113,72 @@ app.delete("/api/jobs/image/:id", authenticate, async (req, res) => {
   }
 });
 
+
+app.delete("/api/jobs/images/bulk", authenticate, async (req, res) => {
+  try {
+    const { ids } = req.body;
+    const requestingUserId = req.user.id;
+    const supabase = require("./config/supabase");
+    const BUCKET_NAME = "ai-kanban-storage";
+    const storageService = require("./services/storageService");
+
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ error: "ids array is required and must not be empty" });
+    }
+
+    if (ids.length > 2000) {
+      return res.status(400).json({ error: "Maximum 2000 files can be deleted at once" });
+    }
+
+    const { data: filesData, error: fetchError } = await supabase
+      .from("storage_files")
+      .select("id, storage_key, thumbnail_key, user_id, size_bytes")
+      .in("id", ids);
+
+    if (fetchError) {
+      return res.status(500).json({ error: "Error fetching files from database" });
+    }
+
+    if (!filesData || filesData.length === 0) {
+      return res.status(404).json({ error: "No files found" });
+    }
+
+    const unauthorizedFiles = filesData.filter(f => f.user_id && f.user_id !== requestingUserId);
+    if (unauthorizedFiles.length > 0) {
+      return res.status(403).json({ error: "Forbidden", message: "You do not have permission to delete some of these files" });
+    }
+
+    const validIds = filesData.map(f => f.id);
+    const keysToDelete = filesData.map(f => f.storage_key);
+    filesData.forEach(f => {
+      if (f.thumbnail_key) keysToDelete.push(f.thumbnail_key);
+    });
+
+    const { error: dbError } = await supabase
+      .from("storage_files")
+      .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+      .in("id", validIds);
+
+    if (dbError) throw dbError;
+
+    const { error: storageError } = await supabase.storage
+      .from(BUCKET_NAME)
+      .remove(keysToDelete);
+
+    if (storageError) {
+      console.warn("[API] Bulk Storage removal warning:", storageError.message);
+    }
+
+    await storageService.recalculateUserQuota(requestingUserId);
+
+    console.log(`[API] Bulk Deleted: ${validIds.length} files by user: ${requestingUserId}`);
+    return res.status(200).json({ message: "Files deleted successfully", deletedCount: validIds.length });
+
+  } catch (error) {
+    console.error("[API Bulk Delete Error]:", error.message);
+    return res.status(500).json({ error: "Internal server error while deleting files" });
+  }
+});
 app.use((err, req, res, _next) => {
   console.error("[Global Error Handler]:", err.message);
   if (err.message === "Not allowed by CORS") {
@@ -126,6 +192,7 @@ app.listen(PORT, () => {
   console.log(`[Server] Backend API running on port ${PORT}`);
   require("./worker");
 });
+
 
 
 
