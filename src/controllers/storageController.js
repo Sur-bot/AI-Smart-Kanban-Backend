@@ -71,7 +71,7 @@ exports.batchProcessImages = async (req, res) => {
 
     const invalid = jobs.findIndex(j => !j.fileId || !j.storageKey);
     if (invalid !== -1) {
-      return res.status(400).json({ error: Job at index  is missing fileId or storageKey });
+      return res.status(400).json({ error: `Job at index ${invalid} is missing fileId or storageKey` });
     }
 
     const imageQueue = require('../config/imageQueue');
@@ -84,7 +84,7 @@ exports.batchProcessImages = async (req, res) => {
 
     const queued = await imageQueue.addBulk(bulkJobs);
 
-    console.log([Storage] Batch queued  image jobs (User: ));
+    console.log(`[Storage] Batch queued ${queued.length} image jobs (User: ${req.user ? req.user.id : "unknown"})`);
     return res.status(200).json({ queued: queued.length, message: 'Batch jobs queued successfully' });
 
   } catch (error) {
@@ -92,3 +92,5 @@ exports.batchProcessImages = async (req, res) => {
     return res.status(500).json({ error: 'Failed to queue batch jobs', details: error.message });
   }
 };
+
+
