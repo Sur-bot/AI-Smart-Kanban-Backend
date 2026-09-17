@@ -1,9 +1,8 @@
-require("dotenv").config();
+﻿require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
-const { Queue } = require("bullmq");
-const redisConnection = require("./config/redis");
+const imageQueue = require("./config/imageQueue");
 const { authenticate } = require("./middleware/auth");
 
 const profileRoutes = require("./routes/profileRoutes");
@@ -11,7 +10,6 @@ const projectRoutes = require("./routes/projectRoutes");
 const taskRoutes = require("./routes/taskRoutes");
 const storageRoutes = require('./routes/storageRoutes');
 const userRoutes = require('./routes/userRoutes');
-const storageService = require("./services/storageService");
 
 const app = express();
 
@@ -28,17 +26,14 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization", "apikey", "x-client-info", "Accept", "Origin", "X-Requested-With"]
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
 
-// API routes
 app.use("/api/profile", profileRoutes);
 app.use("/api/projects", projectRoutes);
 app.use("/api/tasks", taskRoutes);
 app.use('/api/storage', storageRoutes);
 app.use('/api/users', userRoutes);
-
-const imageQueue = new Queue("image-processing", { connection: redisConnection });
 
 app.post("/api/jobs/process-image", authenticate, async (req, res) => {
   try {
@@ -131,6 +126,7 @@ app.listen(PORT, () => {
   console.log(`[Server] Backend API running on port ${PORT}`);
   require("./worker");
 });
+
 
 
 

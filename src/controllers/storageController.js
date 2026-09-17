@@ -52,3 +52,43 @@ exports.getFiles = async (req, res) => {
     return res.status(500).json({ error: 'Lỗi khi lấy danh sách file', details: error.message });
   }
 };
+/**
+ * Batch-queue multiple image processing jobs into BullMQ at once.
+ * Expects body: { jobs: [{ fileId, storageKey, userId }] }
+ * Max 2000 jobs per request.
+ */
+exports.batchProcessImages = async (req, res) => {
+  try {
+    const { jobs } = req.body;
+
+    if (!Array.isArray(jobs) || jobs.length === 0) {
+      return res.status(400).json({ error: 'jobs array is required and must not be empty' });
+    }
+
+    if (jobs.length > 2000) {
+      return res.status(400).json({ error: 'Maximum 2000 jobs per batch request' });
+    }
+
+    const invalid = jobs.findIndex(j => !j.fileId || !j.storageKey);
+    if (invalid !== -1) {
+      return res.status(400).json({ error: Job at index  is missing fileId or storageKey });
+    }
+
+    const imageQueue = require('../config/imageQueue');
+
+    const bulkJobs = jobs.map(j => ({
+      name: 'optimize-image',
+      data: { fileId: j.fileId, storageKey: j.storageKey, userId: j.userId || null },
+      opts: { removeOnComplete: true, removeOnFail: false }
+    }));
+
+    const queued = await imageQueue.addBulk(bulkJobs);
+
+    console.log([Storage] Batch queued  image jobs (User: ));
+    return res.status(200).json({ queued: queued.length, message: 'Batch jobs queued successfully' });
+
+  } catch (error) {
+    console.error('[StorageController:batchProcessImages]', error.message);
+    return res.status(500).json({ error: 'Failed to queue batch jobs', details: error.message });
+  }
+};
