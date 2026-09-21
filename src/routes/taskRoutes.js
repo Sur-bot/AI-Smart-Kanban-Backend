@@ -8,6 +8,8 @@ const taskController = require('../controllers/taskController');
 router.use(authenticate);
 
 // -- Task CRUD -----------------------------------------------------------------
+router.delete('/bulk', requireProjectRole('owner', 'admin'), taskController.bulkDeleteTasks);
+router.patch('/bulk', requireProjectRole('owner', 'admin', 'member'), taskController.bulkUpdateTasks);
 router.post('/bulk-move', requireProjectRole('owner', 'admin', 'member'), taskController.bulkMoveTasks);
 router.get('/', taskController.getTasks);
 router.post('/', requireProjectRole('owner', 'admin', 'member'), taskController.createTask);

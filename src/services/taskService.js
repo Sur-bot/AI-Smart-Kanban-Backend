@@ -559,6 +559,40 @@ async function deleteTask(taskId, userId) {
 }
 
 /**
+ * Xóa mềm nhiều Tác vụ cùng lúc (Bulk Delete)
+ */
+async function bulkDeleteTasks(taskIds, userId) {
+  if (!Array.isArray(taskIds) || taskIds.length === 0) {
+    throw new Error('Danh sách ID không hợp lệ');
+  }
+  const { error } = await supabase
+    .from('tasks')
+    .update({ is_deleted: true, deleted_at: new Date().toISOString() })
+    .in('id', taskIds);
+  if (error) throw error;
+  return { success: true, count: taskIds.length };
+}
+
+/**
+ * Cập nhật nhiều tác vụ cùng lúc
+ */
+async function bulkUpdateTasks(taskIds, payload, userId) {
+  const allowedFields = ['status_id', 'priority', 'assignee_id', 'pipeline_status'];
+  const updateData = {};
+  allowedFields.forEach(f => {
+    if (payload[f] !== undefined) updateData[f] = payload[f];
+  });
+  if (Object.keys(updateData).length === 0) {
+    throw new Error('Không có trường hợp lệ để cập nhật');
+  }
+  updateData.updated_at = new Date().toISOString();
+  
+  const { error } = await supabase.from('tasks').update(updateData).in('id', taskIds);
+  if (error) throw error;
+  return { success: true, count: taskIds.length };
+}
+
+/**
  * Thêm Bình luận vào Tác vụ
  */
 async function addComment(taskId, commentData, userId) {
@@ -765,6 +799,8 @@ module.exports = {
   createTask,
   updateTask,
   deleteTask,
+  bulkDeleteTasks,
+  bulkUpdateTasks,
   addComment,
   createChecklist,
   toggleChecklistItem,

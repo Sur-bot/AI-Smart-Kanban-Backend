@@ -65,6 +65,36 @@ exports.deleteTask = async (req, res) => {
   }
 };
 
+exports.bulkDeleteTasks = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { taskIds } = req.body;
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({ error: 'taskIds phai la mang khong rong' });
+    }
+    const result = await taskService.bulkDeleteTasks(taskIds, userId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[TaskController:bulkDeleteTasks] Error:', error);
+    return res.status(500).json({ error: 'Loi server khi xoa hang loat', details: error.message });
+  }
+};
+
+exports.bulkUpdateTasks = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { taskIds } = req.body;
+    if (!taskIds || !Array.isArray(taskIds) || taskIds.length === 0) {
+      return res.status(400).json({ error: 'taskIds phai la mang khong rong' });
+    }
+    const result = await taskService.bulkUpdateTasks(taskIds, req.body, userId);
+    return res.status(200).json(result);
+  } catch (error) {
+    console.error('[TaskController:bulkUpdateTasks] Error:', error);
+    return res.status(500).json({ error: 'Loi server khi cap nhat hang loat', details: error.message });
+  }
+};
+
 exports.addComment = async (req, res) => {
   try {
     const userId = req.user.id;
