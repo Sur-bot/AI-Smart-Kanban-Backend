@@ -15,7 +15,7 @@ router.delete('/:id', requireProjectRole('owner'), projectController.deleteProje
 router.patch('/:id/archive', requireProjectRole('owner', 'admin'), projectController.archiveProject);
 
 // -- Project Statuses ----------------------------------------------------------
-router.get('/:id/statuses', projectController.getProjectStatuses);
+router.get('/:id/statuses', requireProjectRole('owner', 'admin', 'member', 'viewer'), projectController.getProjectStatuses);
 router.post('/:id/statuses', requireProjectRole('owner', 'admin'), projectController.createProjectStatus);
 router.patch('/:id/statuses/:statusId', requireProjectRole('owner', 'admin'), projectController.updateProjectStatus);
 router.delete('/:id/statuses/:statusId', requireProjectRole('owner', 'admin'), projectController.deleteProjectStatus);

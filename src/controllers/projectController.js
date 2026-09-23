@@ -174,7 +174,8 @@ exports.updateMemberRole = async (req, res) => {
     const { memberId } = req.params;
     const { role } = req.body;
     if (!role) return res.status(400).json({ error: 'role is required' });
-    const member = await projectService.updateMemberRole(projectId, memberId, role, req.userRole);
+    const currentUserId = req.user.id;
+    const member = await projectService.updateMemberRole(projectId, memberId, role, currentUserId);
     return res.status(200).json(member);
   } catch (error) {
     const statusCode = error.message.includes('cannot') || error.message.includes('Cannot') ? 403 : 500;
@@ -187,7 +188,8 @@ exports.removeMember = async (req, res) => {
   try {
     const projectId = req.params.id;
     const { memberId } = req.params;
-    const result = await projectService.removeMember(projectId, memberId, req.userRole);
+    const currentUserId = req.user.id;
+    const result = await projectService.removeMember(projectId, memberId, currentUserId);
     return res.status(200).json(result);
   } catch (error) {
     const statusCode = error.message.includes('cannot') || error.message.includes('Cannot') ? 403 : 500;
