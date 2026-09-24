@@ -25,10 +25,10 @@ const aiQuotaService = {
         })
         .select()
         .single();
-      if (insertError) throw insertError;
+      if (insertError) { console.error('DB Quota error on insert:', insertError.message); const err = new Error('D?ch v? t?m th?i kh�ng kh? d?ng'); err.statusCode = 503; throw err; }
       return this.formatQuota(newQuota);
     }
-    if (error) throw error;
+    if (error) { console.error('DB Quota error on select:', error.message); const err = new Error('D?ch v? t?m th?i kh�ng kh? d?ng'); err.statusCode = 503; throw err; }
     return this.formatQuota(data);
   },
 
@@ -72,3 +72,6 @@ const aiQuotaService = {
 };
 
 module.exports = aiQuotaService;
+
+
+
