@@ -1,5 +1,6 @@
 const supabase = require('../config/supabase');
 const projectService = require('./projectService');
+const authService = require('./authService');
 
 /**
  * Lấy danh sách Tác vụ theo bộ lọc linh hoạt
@@ -33,6 +34,23 @@ async function getTasks(filters = {}, userId) {
     const ws = await projectService.getOrCreateDefaultWorkspace(userId);
     targetWorkspaceId = ws.id;
   }
+
+  if (projectId) {
+    await authService.assertProjectMember(projectId, userId);
+  } else {
+    const { data: ownedProjects } = await supabase.from('projects').select('id').eq('owner_id', userId);
+    const { data: memberProjects } = await supabase.from('project_members').select('project_id').eq('user_id', userId);
+    
+    var allowedProjectIds = [
+      ...(ownedProjects || []).map(p => p.id),
+      ...(memberProjects || []).map(p => p.project_id)
+    ];
+
+    if (allowedProjectIds.length === 0) {
+      return { tasks: [], total: 0, page: Number(page), limit: Number(limit), totalPages: 0 };
+    }
+    
+    }
 
   // 2. Xây dựng truy vấn
   let query = supabase
@@ -148,6 +166,10 @@ async function getTasks(filters = {}, userId) {
   const ascending = sortDir.toLowerCase() === 'asc';
   query = query.order(sortBy, { ascending });
 
+    if (!projectId && allowedProjectIds) {
+      query = query.in('project_id', allowedProjectIds);
+    }
+
   // Phân trang
   const from = (page - 1) * limit;
   const to = from + limit - 1;
@@ -231,6 +253,7 @@ async function getTasks(filters = {}, userId) {
  * Lấy chi tiết tác vụ đầy đủ (Full Detail View)
  */
 async function getTaskById(taskId, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'view');
   const { data: task, error } = await supabase
     .from('tasks')
     .select(`
@@ -368,10 +391,12 @@ async function createTask(taskData, userId) {
     targetProjectId = proj.id;
   }
 
+  await authService.assertProjectMember(targetProjectId, userId);
+
   // 3. Resolve Status
   let targetStatusId = statusId;
   if (!targetStatusId) {
-    const statuses = await projectService.getProjectStatuses(targetProjectId);
+    const statuses = await projectService.getProjectStatuses(targetProjectId, userId);
     const defaultStatus = statuses.find(s => s.is_default) || statuses[0];
     if (!defaultStatus) {
       throw new Error('Không tìm thấy trạng thái hợp lệ cho dự án');
@@ -454,6 +479,7 @@ async function createTask(taskData, userId) {
  * Cập nhật Tác vụ
  */
 async function updateTask(taskId, updateData, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'edit');
   // Map camelCase (from Angular frontend) -> snake_case (PostgreSQL columns)
   const camelToSnake = {
     statusId:          'status_id',
@@ -546,6 +572,7 @@ async function updateTask(taskId, updateData, userId) {
  * Xóa mềm Tác vụ
  */
 async function deleteTask(taskId, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'delete');
   const { error } = await supabase
     .from('tasks')
     .update({
@@ -565,6 +592,7 @@ async function bulkDeleteTasks(taskIds, userId) {
   if (!Array.isArray(taskIds) || taskIds.length === 0) {
     throw new Error('Danh sách ID không hợp lệ');
   }
+  await authService.assertTasksAccess(taskIds, userId, 'delete');
   const { error } = await supabase
     .from('tasks')
     .update({ is_deleted: true, deleted_at: new Date().toISOString() })
@@ -577,6 +605,7 @@ async function bulkDeleteTasks(taskIds, userId) {
  * Cập nhật nhiều tác vụ cùng lúc
  */
 async function bulkUpdateTasks(taskIds, payload, userId) {
+  await authService.assertTasksAccess(taskIds, userId, 'edit');
   const allowedFields = ['status_id', 'priority', 'assignee_id', 'pipeline_status'];
   const updateData = {};
   allowedFields.forEach(f => {
@@ -596,6 +625,7 @@ async function bulkUpdateTasks(taskIds, payload, userId) {
  * Thêm Bình luận vào Tác vụ
  */
 async function addComment(taskId, commentData, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'comment');
   const { content, contentJson = null, parentCommentId = null } = commentData;
   if (!content || !content.trim()) {
     throw new Error('Nội dung bình luận không được để trống');
@@ -624,6 +654,7 @@ async function addComment(taskId, commentData, userId) {
  * Tạo Checklist và các mục con
  */
 async function createChecklist(taskId, checklistData, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'edit');
   const { title = 'Danh sách công việc', items = [] } = checklistData;
 
   const { data: checklist, error: clError } = await supabase
@@ -654,6 +685,8 @@ async function createChecklist(taskId, checklistData, userId) {
  * Đổi trạng thái mục Checklist
  */
 async function toggleChecklistItem(itemId, isDone, userId) {
+  const taskId = await authService.getTaskIdFromSubResource('checklist_item', itemId);
+  await authService.assertTaskAccess(taskId, userId, 'edit');
   const { data, error } = await supabase
     .from('task_checklist_items')
     .update({
@@ -673,6 +706,7 @@ async function toggleChecklistItem(itemId, isDone, userId) {
  * Chấm công / Ghi nhận thời gian làm việc (Time Log)
  */
 async function logTime(taskId, timeData, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'edit');
   const { startedAt, endedAt = null, note = '', isBillable = false } = timeData;
 
   const { data, error } = await supabase
@@ -703,6 +737,8 @@ async function bulkMoveTasks(moves, userId) {
   if (!Array.isArray(moves) || moves.length === 0) {
     throw new Error('Dữ liệu không hợp lệ');
   }
+  const taskIds = moves.map(m => m.taskId);
+  await authService.assertTasksAccess(taskIds, userId, 'edit');
 
   const updates = moves.map(move => {
     const payload = {
@@ -731,6 +767,7 @@ async function bulkMoveTasks(moves, userId) {
 
 
 async function getSubtasks(taskId, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'view');
   const { data, error } = await supabase
     .from('tasks')
     .select(`
@@ -746,12 +783,14 @@ async function getSubtasks(taskId, userId) {
 }
 
 async function createSubtask(parentTaskId, subtaskData, userId) {
+  await authService.assertTaskAccess(parentTaskId, userId, 'edit');
   const payload = { ...subtaskData, parentTaskId };
   return createTask(payload, userId);
 }
 
 
-async function getTaskActivities(taskId) {
+async function getTaskActivities(taskId, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'view');
   const { data, error } = await supabase
     .from('task_activities')
     .select(`
@@ -770,6 +809,7 @@ async function getTaskActivities(taskId) {
 
 
 async function addAttachment(taskId, fileData, userId) {
+  await authService.assertTaskAccess(taskId, userId, 'edit');
   const { file_name, storage_key, file_size, mime_type, thumbnail_key, fileName, storageKey, fileSize, mimeType, thumbnailKey } = fileData;
   const { data, error } = await supabase
     .from('task_attachments')

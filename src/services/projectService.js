@@ -1,4 +1,5 @@
 ﻿const supabase = require('../config/supabase');
+const authService = require('./authService');
 
 /**
  * Lấy hoặc tự động tạo Không gian làm việc mặc định cho User
@@ -143,7 +144,8 @@ async function getUserProjects(userId, workspaceId = null) {
 /**
  * Lấy danh sách trạng thái của dự án (theo thứ tự sort_order)
  */
-async function getProjectStatuses(projectId) {
+async function getProjectStatuses(projectId, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin', 'member', 'viewer']);
   const { data, error } = await supabase
     .from('task_statuses')
     .select('*')
@@ -245,7 +247,8 @@ async function createProject(projectData, userId) {
 }
 
 
-async function getProjectLabels(projectId) {
+async function getProjectLabels(projectId, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin', 'member', 'viewer']);
   const { data, error } = await supabase
     .from('labels')
     .select('*')
@@ -255,7 +258,8 @@ async function getProjectLabels(projectId) {
   return data || [];
 }
 
-async function createLabel(projectId, labelData) {
+async function createLabel(projectId, labelData, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin', 'member']);
   const { name, color } = labelData;
   if (!name) throw new Error('Tên nhãn không được để trống');
   const { data, error } = await supabase
@@ -268,7 +272,8 @@ async function createLabel(projectId, labelData) {
 }
 
 
-async function getProjectMembers(projectId) {
+async function getProjectMembers(projectId, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin', 'member', 'viewer']);
   const { data, error } = await supabase
     .from('project_members')
     .select(`
@@ -286,7 +291,8 @@ async function getProjectMembers(projectId) {
 }
 
 
-async function createProjectStatus(projectId, statusData) {
+async function createProjectStatus(projectId, statusData, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin']);
   const { name, color, sortOrder, sort_order } = statusData;
   const order = sortOrder !== undefined ? sortOrder : sort_order;
   const { data, error } = await supabase
@@ -298,7 +304,8 @@ async function createProjectStatus(projectId, statusData) {
   return data;
 }
 
-async function updateProjectStatus(projectId, statusId, statusData) {
+async function updateProjectStatus(projectId, statusId, statusData, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin']);
   const { name, color, sortOrder, sort_order } = statusData;
   const payload = {};
   if (name !== undefined) payload.name = name;
@@ -317,7 +324,8 @@ async function updateProjectStatus(projectId, statusId, statusData) {
   return data;
 }
 
-async function deleteProjectStatus(projectId, statusId, newStatusId) {
+async function deleteProjectStatus(projectId, statusId, newStatusId, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin']);
   if (newStatusId) {
     await supabase.from('tasks').update({ status_id: newStatusId }).eq('status_id', statusId);
   }
@@ -330,7 +338,11 @@ async function deleteProjectStatus(projectId, statusId, newStatusId) {
 /**
  * Them thanh vien vao du an
  */
-async function addMemberToProject(projectId, { userId, role = 'member', jobRole = null }) {
+async function addMemberToProject(projectId, { userId, role = 'member', jobRole = null }, currentUserId) {
+  const callerRole = await authService.assertProjectRole(projectId, currentUserId, ['owner', 'admin']);
+  if ((role === 'admin' || role === 'owner') && callerRole !== 'owner') {
+    throw new Error('Forbidden: Chi Owner moi duoc cap quyen Admin/Owner cho nguoi khac');
+  }
   const VALID_JOB_ROLES = ['PM', 'FE', 'BE', 'QA', 'DevOps', 'Designer', 'Mobile', 'DataAnalyst', 'Other'];
   if (jobRole && !VALID_JOB_ROLES.includes(jobRole)) {
     throw new Error(`job_role khong hop le. Cac gia tri cho phep: ${VALID_JOB_ROLES.join(', ')}`);
@@ -354,7 +366,8 @@ async function addMemberToProject(projectId, { userId, role = 'member', jobRole 
 /**
  * Cap nhat job_role cua mot thanh vien trong du an
  */
-async function updateMemberJobRole(projectId, memberId, jobRole) {
+async function updateMemberJobRole(projectId, memberId, jobRole, currentUserId) {
+  await authService.assertProjectRole(projectId, currentUserId, ['owner', 'admin']);
   const VALID_JOB_ROLES = ['PM', 'FE', 'BE', 'QA', 'DevOps', 'Designer', 'Mobile', 'DataAnalyst', 'Other'];
   if (jobRole !== null && !VALID_JOB_ROLES.includes(jobRole)) {
     throw new Error(`job_role khong hop le. Cac gia tri cho phep: ${VALID_JOB_ROLES.join(', ')}`);
@@ -380,7 +393,8 @@ async function updateMemberJobRole(projectId, memberId, jobRole) {
 /**
  * Update project info (name, description, color, icon, dates, visibility)
  */
-async function updateProject(projectId, updateData) {
+async function updateProject(projectId, updateData, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin']);
   const allowedFields = ['name', 'description', 'color', 'icon', 'cover_url', 'start_date', 'end_date', 'is_public'];
   const payload = {};
   for (const field of allowedFields) {
@@ -410,7 +424,8 @@ async function updateProject(projectId, updateData) {
 /**
  * Soft-delete a project (only owner)
  */
-async function deleteProject(projectId) {
+async function deleteProject(projectId, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner']);
   const { error } = await supabase
     .from('projects')
     .update({ status: 'archived', deleted_at: new Date().toISOString() })
@@ -422,7 +437,8 @@ async function deleteProject(projectId) {
 /**
  * Archive/unarchive a project
  */
-async function archiveProject(projectId, archive = true) {
+async function archiveProject(projectId, archive = true, userId) {
+  await authService.assertProjectRole(projectId, userId, ['owner', 'admin']);
   const newStatus = archive ? 'archived' : 'active';
   const { data, error } = await supabase
     .from('projects')
@@ -438,34 +454,28 @@ async function archiveProject(projectId, archive = true) {
  * Remove a member from a project.
  * Guards: Cannot remove owner; Admin cannot remove another admin
  */
-async function removeMember(projectId, memberId, requestingUserRole) {
-  const { data: target, error: fetchErr } = await supabase
-    .from('project_members')
-    .select('id, role, user_id')
-    .eq('id', memberId)
-    .eq('project_id', projectId)
-    .single();
-
+async function removeMember(projectId, memberId, currentUserId) {
+  const callerRole = await authService.assertProjectRole(projectId, currentUserId, ['owner', 'admin']);
+  const { data: target, error: fetchErr } = await supabase.from('project_members').select('id, role, user_id').eq('id', memberId).eq('project_id', projectId).single();
   if (fetchErr || !target) throw new Error('Member not found in this project');
+  const { data: project } = await supabase.from('projects').select('owner_id').eq('id', projectId).single();
+  if (project && project.owner_id === target.user_id) throw new Error('Forbidden: Không thể xóa Owner. Phải chuyển nhượng dự án trước.');
   if (target.role === 'owner') throw new Error('Cannot remove the project owner. Transfer ownership first.');
-  if (requestingUserRole === 'admin' && target.role === 'admin') {
-    throw new Error('Admin cannot remove another admin. Only the owner can do this.');
-  }
-
-  const { error } = await supabase
-    .from('project_members')
-    .delete()
-    .eq('id', memberId)
-    .eq('project_id', projectId);
+  if (target.role === 'admin' && callerRole !== 'owner') throw new Error('Forbidden: Chỉ Owner mới được quyền xóa Admin khác.');
+  const { error } = await supabase.from('project_members').delete().eq('id', memberId).eq('project_id', projectId);
   if (error) throw error;
-  return { success: true, removedUserId: target.user_id };
+  return { success: true };
 }
 
 /**
  * Change a member's project role.
  * Guards: Cannot change owner role; Admin cannot change another admin
  */
-async function updateMemberRole(projectId, memberId, newRole, requestingUserRole) {
+async function updateMemberRole(projectId, memberId, newRole, currentUserId) {
+  const callerRole = await authService.assertProjectRole(projectId, currentUserId, ['owner', 'admin']);
+  if ((newRole === 'admin' || newRole === 'owner') && callerRole !== 'owner') {
+    throw new Error('Forbidden: Chi Owner moi duoc cap quyen Admin/Owner cho nguoi khac');
+  }
   const VALID_ROLES = ['admin', 'member', 'viewer'];
   if (!VALID_ROLES.includes(newRole)) {
     throw new Error('Invalid role. Allowed: ' + VALID_ROLES.join(', '));

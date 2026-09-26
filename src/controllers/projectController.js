@@ -30,7 +30,7 @@ exports.createProject = async (req, res) => {
 exports.getProjectStatuses = async (req, res) => {
   try {
     const { id: projectId } = req.params;
-    const statuses = await projectService.getProjectStatuses(projectId);
+    const statuses = await projectService.getProjectStatuses(projectId, req.user.id);
     return res.status(200).json(statuses);
   } catch (error) {
     console.error('[ProjectController:getProjectStatuses] Error:', error);
@@ -41,7 +41,7 @@ exports.getProjectStatuses = async (req, res) => {
 exports.getProjectLabels = async (req, res) => {
   try {
     const projectId = req.params.projectId || req.params.id;
-    const labels = await projectService.getProjectLabels(projectId);
+    const labels = await projectService.getProjectLabels(projectId, req.user.id);
     return res.status(200).json(labels);
   } catch (error) {
     return res.status(500).json({ error: 'Lỗi server khi lấy labels', details: error.message });
@@ -51,7 +51,7 @@ exports.getProjectLabels = async (req, res) => {
 exports.createLabel = async (req, res) => {
   try {
     const projectId = req.params.projectId || req.params.id;
-    const label = await projectService.createLabel(projectId, req.body);
+    const label = await projectService.createLabel(projectId, req.body, req.user.id);
     return res.status(201).json(label);
   } catch (error) {
     return res.status(500).json({ error: 'Lỗi server khi tạo label', details: error.message });
@@ -61,7 +61,7 @@ exports.createLabel = async (req, res) => {
 exports.getProjectMembers = async (req, res) => {
   try {
     const projectId = req.params.projectId || req.params.id;
-    const members = await projectService.getProjectMembers(projectId);
+    const members = await projectService.getProjectMembers(projectId, req.user.id);
     return res.status(200).json(members);
   } catch (error) {
     return res.status(500).json({ error: 'Lỗi server khi lấy thành viên', details: error.message });
@@ -71,7 +71,7 @@ exports.getProjectMembers = async (req, res) => {
 exports.createProjectStatus = async (req, res) => {
   try {
     const projectId = req.params.projectId || req.params.id;
-    const status = await projectService.createProjectStatus(projectId, req.body);
+    const status = await projectService.createProjectStatus(projectId, req.body, req.user.id);
     return res.status(201).json(status);
   } catch (error) {
     return res.status(500).json({ error: 'Lỗi server khi tạo status', details: error.message });
@@ -82,7 +82,7 @@ exports.updateProjectStatus = async (req, res) => {
   try {
     const projectId = req.params.projectId || req.params.id;
     const { statusId } = req.params;
-    const status = await projectService.updateProjectStatus(projectId, statusId, req.body);
+    const status = await projectService.updateProjectStatus(projectId, statusId, req.body, req.user.id);
     return res.status(200).json(status);
   } catch (error) {
     return res.status(500).json({ error: 'Lỗi server khi cập nhật status', details: error.message });
@@ -94,7 +94,7 @@ exports.deleteProjectStatus = async (req, res) => {
     const projectId = req.params.projectId || req.params.id;
     const { statusId } = req.params;
     const { newStatusId } = req.body;
-    await projectService.deleteProjectStatus(projectId, statusId, newStatusId);
+    await projectService.deleteProjectStatus(projectId, statusId, newStatusId, req.user.id);
     return res.status(200).json({ success: true, message: 'Đã xóa cột thành công' });
   } catch (error) {
     return res.status(500).json({ error: 'Lỗi server khi xóa status', details: error.message });
@@ -108,7 +108,7 @@ exports.addMember = async (req, res) => {
     if (!userId) {
       return res.status(400).json({ error: 'userId la bat buoc' });
     }
-    const member = await projectService.addMemberToProject(projectId, { userId, role, jobRole });
+    const member = await projectService.addMemberToProject(projectId, { userId, role, jobRole }, req.user.id);
     return res.status(201).json(member);
   } catch (error) {
     console.error('[ProjectController:addMember] Error:', error);
@@ -135,7 +135,7 @@ exports.updateMemberJobRole = async (req, res) => {
 exports.updateProject = async (req, res) => {
   try {
     const projectId = req.params.id;
-    const project = await projectService.updateProject(projectId, req.body);
+    const project = await projectService.updateProject(projectId, req.body, req.user.id);
     return res.status(200).json(project);
   } catch (error) {
     console.error('[ProjectController:updateProject] Error:', error);
@@ -146,7 +146,7 @@ exports.updateProject = async (req, res) => {
 exports.deleteProject = async (req, res) => {
   try {
     const projectId = req.params.id;
-    await projectService.deleteProject(projectId);
+    await projectService.deleteProject(projectId, req.user.id);
     return res.status(200).json({ success: true, message: 'Project deleted' });
   } catch (error) {
     console.error('[ProjectController:deleteProject] Error:', error);
@@ -158,7 +158,7 @@ exports.archiveProject = async (req, res) => {
   try {
     const projectId = req.params.id;
     const { archive = true } = req.body;
-    const project = await projectService.archiveProject(projectId, archive);
+    const project = await projectService.archiveProject(projectId, archive, req.user.id);
     return res.status(200).json(project);
   } catch (error) {
     console.error('[ProjectController:archiveProject] Error:', error);
@@ -174,7 +174,8 @@ exports.updateMemberRole = async (req, res) => {
     const { memberId } = req.params;
     const { role } = req.body;
     if (!role) return res.status(400).json({ error: 'role is required' });
-    const member = await projectService.updateMemberRole(projectId, memberId, role, req.userRole);
+    const currentUserId = req.user.id;
+    const member = await projectService.updateMemberRole(projectId, memberId, role, currentUserId);
     return res.status(200).json(member);
   } catch (error) {
     const statusCode = error.message.includes('cannot') || error.message.includes('Cannot') ? 403 : 500;
@@ -187,7 +188,8 @@ exports.removeMember = async (req, res) => {
   try {
     const projectId = req.params.id;
     const { memberId } = req.params;
-    const result = await projectService.removeMember(projectId, memberId, req.userRole);
+    const currentUserId = req.user.id;
+    const result = await projectService.removeMember(projectId, memberId, currentUserId);
     return res.status(200).json(result);
   } catch (error) {
     const statusCode = error.message.includes('cannot') || error.message.includes('Cannot') ? 403 : 500;
