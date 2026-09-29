@@ -5,7 +5,7 @@ require('dotenv').config();
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const API_URL = 'http://localhost:3000/api';
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false, autoRefreshToken: false } });
 console.log("E2E SUPABASE_URL: " + (SUPABASE_URL ? SUPABASE_URL.substring(0, 25) : "UNDEFINED") + "...");
 async function runRealTest() {
   console.log('--- BAT DAU CHAY TEST THAT VOI DB VA API THUC TE ---');
@@ -48,7 +48,8 @@ async function runRealTest() {
   console.log('DEBUG: resProj status:', resProj.status, 'data:', resProj.data);
   const projectId = resProj.data.id || resProj.data.project?.id;
   console.log('DEBUG: projectId is', projectId);
-  const {data: pCheck, error: pErr} = await supabase.from('projects').select('*').eq('id', projectId).single();
+  const supabaseAdmin1 = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+  const {data: pCheck, error: pErr} = await supabaseAdmin1.from('projects').select('*').eq('id', projectId).single();
   console.log('DEBUG pCheck Error:', pErr);
   console.log('DEBUG: pCheck immediately after create:', pCheck?.id);
   console.log('3. User A tao Task A trong Project A...');
@@ -114,12 +115,24 @@ async function runRealTest() {
     }).catch(e => e.response);
     if (resTransfer.status === 200) {
        console.log('? PASS: transferOwnership hoat dong. Kiem tra DB...');
-       const { data: dbProj, error: dbErr } = await supabase.from('projects').select('owner_id').eq('id', projectId).single();
-       if (dbErr) console.log('DEBUG Error:', dbErr);
-       if (dbProj && dbProj.owner_id === userB_id) {
-         console.log('? PASS: owner_id trong DB da sang cho User B');
-       } else {
-         console.log('? FAIL: owner_id chua chuyen sang User B trong DB', dbProj);
+              let found = false;
+       for (let i = 1; i <= 20; i++) {
+         const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, { auth: { autoRefreshToken: false, persistSession: false } });
+         const { data: dbProj, error: dbErr } = await supabaseAdmin.from('projects').select('owner_id').eq('id', projectId).single();
+         const t = new Date().toISOString().split('T')[1].replace('Z', '');
+         if (dbErr) {
+           console.log('[' + t + '] Lan ' + i + ': LOI - ' + (dbErr.code || dbErr.message));
+         } else if (dbProj && dbProj.owner_id === userB_id) {
+           console.log('[' + t + '] Lan ' + i + ': THANH CONG - owner_id DA DOI sang User B');
+           found = true;
+           break;
+         } else {
+           console.log('[' + t + '] Lan ' + i + ': THAT BAI - owner_id chua doi (' + (dbProj ? dbProj.owner_id : 'null') + ')');
+         }
+         await new Promise(r => setTimeout(r, 100));
+       }
+       if (!found) {
+         console.log('? FAIL: Sau 2 giay, owner_id van chua cap nhat tren client nay.');
        }
     } else {
        console.log('? FAIL: API transfer tra ve ' + resTransfer.status, JSON.stringify(resTransfer.data));
