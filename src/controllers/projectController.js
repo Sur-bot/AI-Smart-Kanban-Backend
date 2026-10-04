@@ -111,6 +111,9 @@ exports.addMember = async (req, res) => {
     const member = await projectService.addMemberToProject(projectId, { userId, role, jobRole }, req.user.id);
     return res.status(201).json(member);
   } catch (error) {
+    if (error.code === '23503') {
+      return res.status(400).json({ error: 'UserNotFound', message: 'Người dùng này không tồn tại trong hệ thống' });
+    }
     console.error('[ProjectController:addMember] Error:', error);
     return res.status(500).json({ error: 'Loi server khi them thanh vien', details: error.message });
   }
