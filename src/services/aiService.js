@@ -2,7 +2,7 @@
 const supabase = require('../config/supabase');
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const MODELS = { fast: 'gemini-2.0-flash', pro: 'gemini-1.5-pro' };
+const MODELS = { fast: 'gemini-3.8-flash', pro: 'gemini-1.5-pro' };
 
 const AI_FUNCTION_DECLARATIONS = [
   {
